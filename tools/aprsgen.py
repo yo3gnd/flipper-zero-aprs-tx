@@ -105,6 +105,43 @@ def afsk_from_bits(bits, lead_silence: float = 0.25, tail_silence: float = 0.25)
     return samples
 
 
+def edge_durations_us_from_bits(bits):
+    freq = MARK
+    phase = 0.0
+    time_s = 0.0
+    bit_index = 0
+    total_bits = len(bits)
+    next_bit_s = BIT_TIME
+    out = []
+
+    while True:
+        edge_phase = math.pi - (phase % math.pi)
+        if edge_phase <= 1e-12:
+            edge_phase = math.pi
+
+        edge_dt_s = edge_phase / (2.0 * math.pi * freq)
+        bit_dt_s = next_bit_s - time_s
+
+        if bit_index >= total_bits:
+            break
+
+        if edge_dt_s <= bit_dt_s + 1e-12:
+            out.append(max(1, int(round(edge_dt_s * 1000000.0))))
+            time_s += edge_dt_s
+            phase += 2.0 * math.pi * freq * edge_dt_s
+            phase %= 2.0 * math.pi
+        else:
+            time_s = next_bit_s
+            phase += 2.0 * math.pi * freq * bit_dt_s
+            phase %= 2.0 * math.pi
+            if bits[bit_index] == 0:
+                freq = SPACE if freq == MARK else MARK
+            bit_index += 1
+            next_bit_s += BIT_TIME
+
+    return out
+
+
 def write_wav(path: Path, samples):
     with wave.open(str(path), "wb") as wf:
         wf.setnchannels(1)
@@ -124,7 +161,29 @@ def build_frame(body: bytes) -> bytes:
     return body + bytes([fcs & 0xFF, (fcs >> 8) & 0xFF])
 
 
-def write_afsk(path: Path, body: bytes):
+def c_array_text(name: str, body: bytes, bits, durations_us):
+    frame = build_frame(body)
+    hex_frame = ", ".join(f"0x{b:02X}" for b in frame)
+    hex_body = ", ".join(f"0x{b:02X}" for b in body)
+
+    dur_lines = []
+    for i in range(0, len(durations_us), 16):
+        chunk = durations_us[i:i + 16]
+        dur_lines.append("    " + ", ".join(str(x) for x in chunk) + ",")
+
+    return (
+        f"/* {name} */\n"
+        f"/* src={SRC_CALL} dst={DST_CALL} */\n"
+        f"static const uint8_t {name}_frame[] = {{ {hex_frame} }};\n"
+        f"static const uint8_t {name}_body[] = {{ {hex_body} }};\n"
+        f"static const uint16_t {name}_durations_us[] = {{\n" + "\n".join(dur_lines) + "\n};\n"
+        f"static const uint32_t {name}_durations_count = {len(durations_us)};\n"
+        f"static const uint32_t {name}_bits_count = {len(bits)};\n"
+        f"static const bool {name}_start_level = false;\n"
+    )
+
+
+def write_afsk(path: Path, txt_path: Path, array_name: str, body: bytes):
     frame = build_frame(body)
     flags_pre = bytes([0x7E] * 50)
     flags_post = bytes([0x7E] * 3)
@@ -133,44 +192,46 @@ def write_afsk(path: Path, body: bytes):
     bits += list(_bit_stuff(makeLSB(frame)))
     bits += list(makeLSB(flags_post))
     write_wav(path, afsk_from_bits(bits))
+    txt_path.write_text(c_array_text(array_name, body, bits, edge_durations_us_from_bits(bits)), encoding="ascii")
 
 
 def main():
     out1 = BASE_DIR / "1_code_minimum.wav"
     out2 = BASE_DIR / "2_ax25_minimum.wav"
-
     out3 = BASE_DIR / "3_aprs_packet.wav"
-    
+    txt1 = BASE_DIR / "1_code_minimum.txt"
+    txt2 = BASE_DIR / "2_ax25_minimum.txt"
+    txt3 = BASE_DIR / "3_aprs_packet.txt"
     msgfile = BASE_DIR / "messages.txt"
 
     body1 = bytearray()
     body1 += mkHeader(DST_CALL, 0, 0, False)
     body1 += bytes([0x03, 0xF0])
     body1 += MSG1.encode("ascii")
-    write_afsk(out1, bytes(body1))
+    write_afsk(out1, txt1, "packet1_code_minimum", bytes(body1))
 
     body2 = bytearray()
     body2 += ax25_addr(DST_CALL, 0, False)
     body2 += ax25_addr(SRC_CALL, 0, True)
     body2 += bytes([0x03, 0xF0])
     body2 += MSG2.encode("ascii")
-    write_afsk(out2, bytes(body2))
-
-
-
+    write_afsk(out2, txt2, "packet2_ax25_minimum", bytes(body2))
 
     body3 = bytearray()
     body3 += ax25_addr(DST_CALL, 0, False)
     body3 += ax25_addr(SRC_CALL, 0, True)
     body3 += bytes([0x03, 0xF0])
     body3 += b">" + MSG3.encode("ascii")
-    write_afsk(out3, bytes(body3))
+    write_afsk(out3, txt3, "packet3_aprs_packet", bytes(body3))
 
     msgfile.write_text( MSG1 + "\n" + MSG2 + "\n" + MSG3 + "\n", encoding="ascii",)
 
     print(out1)
+    print(txt1)
     print(out2)
+    print(txt2)
     print(out3)
+    print(txt3)
     print(msgfile)
 
 

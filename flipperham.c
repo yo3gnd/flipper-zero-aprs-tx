@@ -9,7 +9,10 @@
 #include <stdio.h>
 
 #define CARRIER_HZ 433500000UL
-#define SEG 6U
+
+#include "tools/3_aprs_packet.txt"
+
+#define SEG packet3_aprs_packet_durations_count
 
 typedef struct {
     Gui* gui;
@@ -18,7 +21,7 @@ typedef struct {
     volatile uint16_t current_half_period_us;
     volatile uint16_t edgess;
 
-    volatile uint8_t segment_index;
+    volatile uint16_t segment_index;
 
 
 
@@ -27,12 +30,6 @@ typedef struct {
     volatile bool tx_done;
     volatile bool tx_allowed;
 } FlipperHamApp;
-
-static const uint16_t flipperham_tones_hz[SEG] = { 2200, 1200,  2200, 1200,   2200, 1200, };
-
-static const uint16_t flipperham_half_periods_us[SEG] = { 227, 417, 227, 417, 227, 417, };
-
-static const uint16_t flipperham_edges_per_segment[SEG] = { 4400, 2400, 4400, 2400, 4400, 2400, };
 
 static void flipperham_draw_callback(Canvas* canvas, void* context) 
 {
@@ -61,11 +58,11 @@ static void flipperham_draw_callback(Canvas* canvas, void* context)
 static void flipperham_load_first_segment(FlipperHamApp* app) 
 {
     app->segment_index = 0;
-    app->level = false;
+    app->level = packet3_aprs_packet_start_level;
     app->tx_done = false;
-    app->current_tone_hz = flipperham_tones_hz[0];
-    app->current_half_period_us = flipperham_half_periods_us[0];
-    app->edgess = flipperham_edges_per_segment[0];
+    app->current_tone_hz = 0;
+    app->current_half_period_us = packet3_aprs_packet_durations_us[0];
+    app->edgess = 0;
 }
 
 static LevelDuration flipperham_yield(void* context) 
@@ -79,20 +76,11 @@ static LevelDuration flipperham_yield(void* context)
 
     level_duration = level_duration_make(app->level, app->current_half_period_us);
     app->level = !app->level;
-
-    if(app->edgess > 0) 
-        app->edgess--;
-
-    if(app->edgess == 0) 
-    {
-        app->segment_index++;
-        if(app->segment_index >= SEG) {
-            app->tx_done = true;
-        } else {
-            app->current_tone_hz = flipperham_tones_hz[app->segment_index];
-            app->current_half_period_us = flipperham_half_periods_us[app->segment_index];
-            app->edgess = flipperham_edges_per_segment[app->segment_index];
-        }
+    app->segment_index++;
+    if(app->segment_index >= SEG) {
+        app->tx_done = true;
+    } else {
+        app->current_half_period_us = packet3_aprs_packet_durations_us[app->segment_index];
     }
 
     return level_duration;
