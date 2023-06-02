@@ -50,7 +50,7 @@ def _bit_stuff(bits):
                 yield 0
                 c = 0
         else:
-            ones = 0
+            c = 0
 
 
 def ax25_addr(call: str, ssid: int, last: bool) -> bytes:
