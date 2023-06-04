@@ -112,6 +112,7 @@ def edge_durations_us_from_bits(bits):
     bit_index = 0
     total_bits = len(bits)
     next_bit_s = BIT_TIME
+    pending_s = 0.0
     out = []
 
     while True:
@@ -126,11 +127,14 @@ def edge_durations_us_from_bits(bits):
             break
 
         if edge_dt_s <= bit_dt_s + 1e-12:
-            out.append(max(1, int(round(edge_dt_s * 1000000.0))))
+            pending_s += edge_dt_s
+            out.append(max(1, int(round(pending_s * 1000000.0))))
+            pending_s = 0.0
             time_s += edge_dt_s
             phase += 2.0 * math.pi * freq * edge_dt_s
             phase %= 2.0 * math.pi
         else:
+            pending_s += bit_dt_s
             time_s = next_bit_s
             phase += 2.0 * math.pi * freq * bit_dt_s
             phase %= 2.0 * math.pi

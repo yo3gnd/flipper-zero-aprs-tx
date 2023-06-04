@@ -58,7 +58,7 @@ static void flipperham_draw_callback(Canvas* canvas, void* context)
 static void flipperham_load_first_segment(FlipperHamApp* app) 
 {
     app->segment_index = 0;
-    app->level = packet3_aprs_packet_start_level;
+    app->level = !packet3_aprs_packet_start_level;
     app->tx_done = false;
     app->current_tone_hz = 0;
     app->current_half_period_us = packet3_aprs_packet_durations_us[0];
