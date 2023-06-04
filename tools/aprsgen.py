@@ -11,6 +11,7 @@ BAUD = 1200.0
 MARK = 1200.0
 SPACE = 2200.0
 BIT_TIME = 1.0 / BAUD
+PREAMBLE_MS = 50.0
 
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -191,8 +192,10 @@ def write_afsk(path: Path, txt_path: Path, array_name: str, body: bytes):
     frame = build_frame(body)
     flags_pre = bytes([0x7E] * 50)
     flags_post = bytes([0x7E] * 3)
+    preamble_bits = [1] * int(round((PREAMBLE_MS / 1000.0) / BIT_TIME))
 
-    bits = list(makeLSB(flags_pre))
+    bits = list(preamble_bits)
+    bits += list(makeLSB(flags_pre))
     bits += list(_bit_stuff(makeLSB(frame)))
     bits += list(makeLSB(flags_post))
     write_wav(path, afsk_from_bits(bits))
