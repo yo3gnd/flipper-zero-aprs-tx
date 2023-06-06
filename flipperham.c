@@ -21,6 +21,10 @@ typedef struct {
     const uint8_t* regs;
 } FlipperHamPreset;
 
+enum {
+    FlipperHamPresetDefault = 0,
+};
+
 #define FLIPPERHAM_ASYNC_PRESET(NAME, MOD, DRATE3, DRATE4, DEV) \
 static const uint8_t NAME[] = { \
     CC1101_IOCFG0, 0x0D, \
@@ -66,9 +70,6 @@ typedef struct {
     volatile uint16_t edgess;
 
     volatile uint16_t segment_index;
-    uint8_t preset_index;
-
-
 
     volatile bool level;
     volatile bool tx_started;
@@ -81,6 +82,8 @@ static const FlipperHamPreset flipperham_presets[] = {
     { "GFSK 4.8", flipperham_preset_gfsk_dev5_16khz_async_regs },
     { "GFSK 9.99", flipperham_preset_gfsk_dev5_16khz_fast_async_regs },
 };
+
+static const FlipperHamPreset* flipperham_preset = &flipperham_presets[FlipperHamPresetDefault];
 
 static void flipperham_input_callback(InputEvent* input_event, void* context) {
     FuriMessageQueue* event_queue = context;
@@ -115,15 +118,15 @@ static void flipperham_draw_callback(Canvas* canvas, void* context)
             24,
             AlignCenter,
             AlignCenter,
-            flipperham_presets[app->preset_index].name);
+            flipperham_preset->name);
         canvas_set_font(canvas, FontSecondary);
-        canvas_draw_str_aligned(canvas, 64, 42, AlignCenter, AlignCenter, "L/R OK");
+        canvas_draw_str_aligned(canvas, 64, 42, AlignCenter, AlignCenter, "OK");
         return;
     }
 
     canvas_set_font(canvas, FontSecondary);
     canvas_draw_str_aligned(
-        canvas, 64, 14, AlignCenter, AlignCenter, flipperham_presets[app->preset_index].name);
+        canvas, 64, 14, AlignCenter, AlignCenter, flipperham_preset->name);
     canvas_set_font(canvas, FontPrimary);
     snprintf(text, sizeof(text), "%u", app->current_tone_hz); canvas_draw_str_aligned(canvas, 64, 32, AlignCenter, AlignCenter, text);
 }
@@ -170,7 +173,7 @@ static void flipperham_radio_start(FlipperHamApp* app)
 
 
 
-    furi_hal_subghz_load_custom_preset((uint8_t*)flipperham_presets[app->preset_index].regs);
+    furi_hal_subghz_load_custom_preset((uint8_t*)flipperham_preset->regs);
     furi_hal_subghz_set_frequency_and_path(433250000UL);
     furi_hal_subghz_flush_tx();
 
@@ -203,7 +206,6 @@ int32_t flipperham_app(void* p) {
     app->event_queue = furi_message_queue_alloc(8, sizeof(InputEvent));
     app->tx_started = false;
     app->tx_allowed = true;
-    app->preset_index = 0;
 
     flipperham_load_first_segment(app);
 
@@ -227,14 +229,6 @@ int32_t flipperham_app(void* p) {
                 furi_record_close(RECORD_GUI);
                 free(app);
                 return 0;
-            } else if(event.key == InputKeyLeft) {
-                if(app->preset_index > 0) {
-                    app->preset_index--;
-                }
-            } else if(event.key == InputKeyRight) {
-                if(app->preset_index < COUNT_OF(flipperham_presets) - 1) {
-                    app->preset_index++;
-                }
             } else if(event.key == InputKeyOk) {
                 break;
             }
