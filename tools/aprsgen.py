@@ -1,15 +1,19 @@
 #!/usr/bin/env python3
 
-import math
 import struct
 import wave
 from pathlib import Path
 
 SAMPLE_RATE = 44100
 AMP = 0.6
-BAUD = 1200.0
-MARK = 1200.0
-SPACE = 2200.0
+MODEM = "1200bd"
+MERGE_SAME_LEVEL_SEGMENTS = False
+MODEMS = {
+    "1200bd": (1200.0, 1200.0, 2200.0),
+    "300bd": (300.0, 1600.0, 1800.0),
+}
+
+BAUD, MARK, SPACE = MODEMS[MODEM]
 BIT_TIME = 1.0 / BAUD
 PREAMBLE_MS = 50.0
 
@@ -66,85 +70,82 @@ def mkHeader(dest: str, ssid: int = 0, qso: int = 0, cmd: bool = False) -> bytes
     vals = [(ord(c) - 0x20) & 0x3F for c in dest[:6]]
 
     b0 = (qso >> 6) & 0xFF
-    b1 = ((qso & 0x3F) << 2) | (2 if cmd else 0) | 1
-    b2 = ((vals[0] & 0x3F) << 2) | ((vals[1] >> 4) & 0x03)
-    b3 = ((vals[1] & 0x0F) << 4) | ((vals[2] >> 2) & 0x0F)
-    b4 = ((vals[2] & 0x03) << 6) | (vals[3] &   0x3F)
-    b5 = ((vals[4] & 0x3F) << 2) | ((vals[5] >> 4)  & 0x03)
-    b6 = ((vals[5] & 0x0F) << 4) | (ssid & 0x0F)
+    b1 = ((qso & 0x3F) << 2)        | (2 if cmd else 0) | 1
+    b2 = ((vals[0] & 0x3F) << 2)    | ((vals[1] >> 4) & 0x03)
+    b3 = ((vals[1] & 0x0F) << 4)    | ((vals[2] >> 2) & 0x0F)
+    b4 = ((vals[2] & 0x03) << 6)    | (vals[3] &   0x3F)
+    b5 = ((vals[4] & 0x3F) << 2)    | ((vals[5] >> 4)  & 0x03)
+    b6 = ((vals[5] & 0x0F) << 4)    | (ssid & 0x0F)
 
     return bytes([b0, b1, b2, b3, b4, b5, b6])
 
 
-def afsk_from_bits(bits, lead_silence: float = 0.25, tail_silence: float = 0.25):
-    samples = []
-    phase = 0.0
-    tone = MARK
-    t = 0.0
+def append_segment(segments, level: bool, duration_us: float):
+    if duration_us <= 1e-9:
+        return
 
-    samples.extend([0.0] * int(lead_silence * SAMPLE_RATE))
-
-    for bit in bits:
-        if bit == 0:
-            tone = SPACE if tone == MARK else MARK
-
-        next_t = t + BIT_TIME
-        n0 = round(t * SAMPLE_RATE)
-        n1 = round(next_t * SAMPLE_RATE)
-        n = max(1, n1 - n0)
-        step = 2.0 * math.pi * tone / SAMPLE_RATE
-
-        for _ in range(n):
-            samples.append(math.sin(phase) * AMP)
-            phase += step
-            if phase > 2.0 * math.pi:
-                phase -= 2.0 * math.pi
-
-        t = next_t
-
-    samples.extend([0.0] * int(tail_silence * SAMPLE_RATE))
-    return samples
+    if MERGE_SAME_LEVEL_SEGMENTS and segments and segments[-1][0] == level:
+        segments[-1][1] += duration_us
+    else:
+        segments.append([level, duration_us])
 
 
 def edge_durations_us_from_bits(bits):
     freq = MARK
-    phase = 0.0
-    time_s = 0.0
-    bit_index = 0
-    total_bits = len(bits)
-    next_bit_s = BIT_TIME
-    pending_s = 0.0
+    level = True
+    bit_time_us = BIT_TIME * 1000000.0
+    segments = []
+
+    for bit in bits:
+        if bit == 0:
+            freq = SPACE if freq == MARK else MARK
+
+        half_period_us = 1000000.0 / (2.0 * freq)
+        elapsed_us = 0.0
+
+        while elapsed_us + half_period_us < bit_time_us - 1e-9:
+            append_segment(segments, level, half_period_us)
+            level = not level
+            elapsed_us += half_period_us
+
+        append_segment(segments, level, bit_time_us - elapsed_us)
+
     out = []
+    carry_us = 0.0
 
-    while True:
-        edge_phase = math.pi - (phase % math.pi)
-        if edge_phase <= 1e-12:
-            edge_phase = math.pi
-
-        edge_dt_s = edge_phase / (2.0 * math.pi * freq)
-        bit_dt_s = next_bit_s - time_s
-
-        if bit_index >= total_bits:
-            break
-
-        if edge_dt_s <= bit_dt_s + 1e-12:
-            pending_s += edge_dt_s
-            out.append(max(1, int(round(pending_s * 1000000.0))))
-            pending_s = 0.0
-            time_s += edge_dt_s
-            phase += 2.0 * math.pi * freq * edge_dt_s
-            phase %= 2.0 * math.pi
-        else:
-            pending_s += bit_dt_s
-            time_s = next_bit_s
-            phase += 2.0 * math.pi * freq * bit_dt_s
-            phase %= 2.0 * math.pi
-            if bits[bit_index] == 0:
-                freq = SPACE if freq == MARK else MARK
-            bit_index += 1
-            next_bit_s += BIT_TIME
+    for _, duration_us in segments:
+        rounded_us = int(round(duration_us + carry_us))
+        carry_us += duration_us - rounded_us
+        if rounded_us <= 0:
+            continue
+        out.append(rounded_us)
 
     return out
+
+
+def waveform_from_durations_us(
+    durations_us,
+    start_level: bool,
+    lead_silence: float = 0.25,
+    tail_silence: float = 0.25,
+):
+    samples = []
+    level = not start_level
+    time_s = 0.0
+
+    samples.extend([0.0] * int(lead_silence * SAMPLE_RATE))
+
+    for duration_us in durations_us:
+        next_time_s = time_s + (duration_us / 1000000.0)
+        n0 = round(time_s * SAMPLE_RATE)
+        n1 = round(next_time_s * SAMPLE_RATE)
+        n = max(1, n1 - n0)
+        samples.extend(([AMP] if level else [-AMP]) * n)
+        level = not level
+        time_s = next_time_s
+
+    samples.extend([0.0] * int(tail_silence * SAMPLE_RATE))
+    return samples
 
 
 def write_wav(path: Path, samples):
@@ -198,8 +199,9 @@ def write_afsk(path: Path, txt_path: Path, array_name: str, body: bytes):
     bits += list(makeLSB(flags_pre))
     bits += list(_bit_stuff(makeLSB(frame)))
     bits += list(makeLSB(flags_post))
-    write_wav(path, afsk_from_bits(bits))
-    txt_path.write_text(c_array_text(array_name, body, bits, edge_durations_us_from_bits(bits)), encoding="ascii")
+    durations_us = edge_durations_us_from_bits(bits)
+    write_wav(path, waveform_from_durations_us(durations_us, False))
+    txt_path.write_text(c_array_text(array_name, body, bits, durations_us), encoding="ascii")
 
 
 def main():
@@ -235,8 +237,10 @@ def main():
 
     print(out1)
     print(txt1)
+
     print(out2)
     print(txt2)
+    
     print(out3)
     print(txt3)
     print(msgfile)
