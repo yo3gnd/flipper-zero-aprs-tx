@@ -2,7 +2,7 @@
 
 #include <furi_hal.h>
 #include <gui/gui.h>
-#include <gui/modules/submenu.h>
+#include <gui/modules/variable_item_list.h>
 #include <gui/view.h>
 #include <gui/view_dispatcher.h>
 #include <gui/view_port.h>
@@ -79,7 +79,7 @@ FLIPPERHAM_ASYNC_PRESET(flipperham_preset_gfsk_dev5_16khz_fast_async_regs, 0x14,
 typedef struct {
     Gui* gui;
     ViewDispatcher* view_dispatcher;
-    Submenu* submenu;
+    VariableItemList* variable_item_list;
     ViewPort* view_port;
     volatile uint16_t current_tone_hz;
     volatile uint16_t current_half_period_us;
@@ -89,6 +89,7 @@ typedef struct {
     volatile bool tx_done;
     volatile bool tx_allowed;
     bool send_requested;
+    uint8_t encoding_index;
 } FlipperHamApp;
 
 enum {
@@ -96,7 +97,8 @@ enum {
 };
 
 enum {
-    FlipperHamSubmenuIndexSend = 0,
+    FlipperHamMenuIndexEncoding = 0,
+    FlipperHamMenuIndexSend,
 };
 
 static const FlipperHamPreset flipperham_presets[] = {
@@ -113,6 +115,10 @@ static const FlipperHamModemProfile flipperham_modem_profiles[] = {
 static const FlipperHamPreset* flipperham_preset = &flipperham_presets[FlipperHamPresetDefault];
 static const FlipperHamModemProfile* flipperham_modem_profile =
     &flipperham_modem_profiles[FlipperHamModemProfileDefault];
+static const char* flipperham_encoding_text[] = {
+    "300 bd",
+    "1200 bd",
+};
 static uint32_t flipperham_pin2_dma_buffer[API_HAL_SUBGHZ_ASYNC_TX_BUFFER_FULL];
 static volatile uint16_t flipperham_pin2_dma_index = 0;
 static volatile bool flipperham_pin2_dma_running = false;
@@ -123,16 +129,25 @@ static uint32_t flipperham_exit_callback(void* context)
     return VIEW_NONE;
 }
 
-static void flipperham_submenu_callback(void* context, uint32_t index) 
+static void flipperham_encoding_change(VariableItem* item)
+{
+    FlipperHamApp* app = variable_item_get_context(item);
+    uint8_t index = variable_item_get_current_value_index(item);
+
+    app->encoding_index = index;
+    variable_item_set_current_value_text(item, flipperham_encoding_text[index]);
+}
+
+static void flipperham_menu_callback(void* context, uint32_t index) 
 {
     FlipperHamApp* app = context;
 
-    if(index != FlipperHamSubmenuIndexSend) {
-        return;
+    if(index == FlipperHamMenuIndexSend) 
+    {
+        app->send_requested = true;
+        view_dispatcher_stop(app->view_dispatcher);
     }
 
-    app->send_requested = true;
-    view_dispatcher_stop(app->view_dispatcher);
 }
 
 static void flipperham_draw_callback(Canvas* canvas, void* context) 
@@ -345,23 +360,32 @@ static void flipperham_radio_stop(FlipperHamApp* app)
 
 static FlipperHamApp* flipperham_app_alloc(void) {
     FlipperHamApp* app = malloc(sizeof(FlipperHamApp));
+    VariableItem* item;
 
     app->gui = furi_record_open(RECORD_GUI);
     app->view_dispatcher = view_dispatcher_alloc();
-    app->submenu = submenu_alloc();
+    app->variable_item_list = variable_item_list_alloc();
 
         app->view_port = NULL;
         app->tx_started = false;
         app->tx_allowed = true;
         app->tx_done = false;
         app->send_requested = false;
+        app->encoding_index = FlipperHamModemProfileDefault;
 
     view_dispatcher_enable_queue( app->view_dispatcher);
     view_dispatcher_attach_to_gui(app->view_dispatcher, app->gui, ViewDispatcherTypeFullscreen);
 
-    submenu_add_item( app->submenu, "Send", FlipperHamSubmenuIndexSend, flipperham_submenu_callback, app);
-    view_set_previous_callback(submenu_get_view(app->submenu), flipperham_exit_callback);
-    view_dispatcher_add_view( app->view_dispatcher, FlipperHamViewSubmenu, submenu_get_view(app->submenu));
+    variable_item_list_set_enter_callback( app->variable_item_list, flipperham_menu_callback, app);
+
+    item = variable_item_list_add( app->variable_item_list, "Encoding", 2, flipperham_encoding_change, app);
+    variable_item_set_current_value_index(item, app->encoding_index);
+    variable_item_set_current_value_text(item, flipperham_encoding_text[app->encoding_index]);
+
+    variable_item_list_add( app->variable_item_list, "Send", 0, NULL, app);
+
+    view_set_previous_callback(variable_item_list_get_view(app->variable_item_list), flipperham_exit_callback);
+    view_dispatcher_add_view( app->view_dispatcher, FlipperHamViewSubmenu, variable_item_list_get_view(app->variable_item_list));
     view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewSubmenu);
 
     flipperham_load_first_segment(app);
@@ -377,10 +401,10 @@ static void flipperham_menu_free(FlipperHamApp* app)
         app->view_dispatcher = NULL;
     }
 
-    if(app->submenu) 
+    if(app->variable_item_list) 
     {
-        submenu_free(app->submenu);
-        app->submenu = NULL;
+        variable_item_list_free(app->variable_item_list);
+        app->variable_item_list = NULL;
     }
 }
 
