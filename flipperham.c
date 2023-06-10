@@ -97,8 +97,8 @@ enum {
 };
 
 enum {
-    FlipperHamMenuIndexEncoding = 0,
-    FlipperHamMenuIndexSend,
+    FlipperHamMenuIndexSend = 0,
+    FlipperHamMenuIndexEncoding,
 };
 
 static const FlipperHamPreset flipperham_presets[] = {
@@ -378,11 +378,11 @@ static FlipperHamApp* flipperham_app_alloc(void) {
 
     variable_item_list_set_enter_callback( app->variable_item_list, flipperham_menu_callback, app);
 
+    variable_item_list_add( app->variable_item_list, "Send", 0, NULL, app);
+
     item = variable_item_list_add( app->variable_item_list, "Encoding", 2, flipperham_encoding_change, app);
     variable_item_set_current_value_index(item, app->encoding_index);
     variable_item_set_current_value_text(item, flipperham_encoding_text[app->encoding_index]);
-
-    variable_item_list_add( app->variable_item_list, "Send", 0, NULL, app);
 
     view_set_previous_callback(variable_item_list_get_view(app->variable_item_list), flipperham_exit_callback);
     view_dispatcher_add_view( app->view_dispatcher, FlipperHamViewSubmenu, variable_item_list_get_view(app->variable_item_list));
