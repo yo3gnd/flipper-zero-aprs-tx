@@ -20,7 +20,7 @@ PREAMBLE_MS = 50.0
 BASE_DIR = Path(__file__).resolve().parent
 
 SRC_CALL = "YO0FLP"
-DST_CALL = "W0RLDT"
+DST_CALL = "W0RLD"
 
 MSG1 = "TEST TEST 123"
 MSG2 = "HELLO WORLD"

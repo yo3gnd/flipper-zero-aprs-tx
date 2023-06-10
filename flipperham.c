@@ -219,7 +219,6 @@ static void flipperham_pin2_dma_isr(void* context)
         return;
     }
 
-#if FLIPPERHAM_PIN2_DMA_CHANNEL == LL_DMA_CHANNEL_3
     if(LL_DMA_IsActiveFlag_HT3(FLIPPERHAM_PIN2_DMA)) {
         LL_DMA_ClearFlag_HT3(FLIPPERHAM_PIN2_DMA);
         flipperham_pin2_fill(
@@ -233,9 +232,6 @@ static void flipperham_pin2_dma_isr(void* context)
             flipperham_pin2_dma_buffer + API_HAL_SUBGHZ_ASYNC_TX_BUFFER_HALF,
             API_HAL_SUBGHZ_ASYNC_TX_BUFFER_HALF);
     }
-#else
-#error Update this code. Would you kindly?
-#endif
 }
 
 static void flipperham_pin2_start(void)
@@ -277,7 +273,6 @@ static void flipperham_pin2_stop(void)
     LL_DMA_DisableChannel(FLIPPERHAM_PIN2_DMA_DEF);
     LL_DMA_DisableIT_HT(FLIPPERHAM_PIN2_DMA_DEF);
     LL_DMA_DisableIT_TC(FLIPPERHAM_PIN2_DMA_DEF);
-#if FLIPPERHAM_PIN2_DMA_CHANNEL == LL_DMA_CHANNEL_3
     if(LL_DMA_IsActiveFlag_HT3(FLIPPERHAM_PIN2_DMA)) {
         LL_DMA_ClearFlag_HT3(FLIPPERHAM_PIN2_DMA);
     }
@@ -285,7 +280,6 @@ static void flipperham_pin2_stop(void)
     if(LL_DMA_IsActiveFlag_TC3(FLIPPERHAM_PIN2_DMA)) {
         LL_DMA_ClearFlag_TC3(FLIPPERHAM_PIN2_DMA);
     }
-#endif
     LL_DMA_DeInit(FLIPPERHAM_PIN2_DMA_DEF);
     furi_hal_interrupt_set_isr(FLIPPERHAM_PIN2_DMA_IRQ, NULL, NULL);
     furi_hal_gpio_write(&gpio_ext_pa7, false);
