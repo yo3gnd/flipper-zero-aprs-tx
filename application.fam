@@ -1,12 +1,12 @@
 App(
-    appid="flipperham",
-    name="FlipperHam",
+    appid="aprstx",
+    name="Flipper ham APRS TX",
     apptype=FlipperAppType.EXTERNAL,
     entry_point="flipperham_app",
     requires=["gui"],
     sources=["flipperham.c", "packet.c"],
     stack_size=2 * 1024,
-    fap_icon="flipperham_10px.png",
-    fap_category="Sub-GHz",
+    fap_icon="flipperham.png",
+    fap_category="Tools",
     targets=["f7"],
 )
