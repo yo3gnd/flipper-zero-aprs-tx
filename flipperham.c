@@ -153,7 +153,6 @@ static void flipperham_menu_callback(void* context, uint32_t index)
 static void flipperham_draw_callback(Canvas* canvas, void* context) 
 {
     FlipperHamApp* app = context;
-    char text[32];
 
     canvas_clear(canvas);
     canvas_set_font(canvas, FontPrimary);
@@ -171,24 +170,7 @@ static void flipperham_draw_callback(Canvas* canvas, void* context)
         return;
     }
 
-    if(!app->tx_started) {
-        canvas_draw_str_aligned(
-            canvas,
-            64,
-            24,
-            AlignCenter,
-            AlignCenter,
-            flipperham_preset->name);
-        canvas_set_font(canvas, FontSecondary);
-        canvas_draw_str_aligned(canvas, 64, 42, AlignCenter, AlignCenter, "Sending");
-        return;
-    }
-
-    canvas_set_font(canvas, FontSecondary);
-    canvas_draw_str_aligned(
-        canvas, 64, 14, AlignCenter, AlignCenter, flipperham_preset->name);
-    canvas_set_font(canvas, FontPrimary);
-    snprintf(text, sizeof(text), "%u", app->current_tone_hz); canvas_draw_str_aligned(canvas, 64, 32, AlignCenter, AlignCenter, text);
+        canvas_draw_str_aligned(canvas, 64, 32, AlignCenter, AlignCenter, "Sending...");
 }
 
 static uint16_t flipperham_segment_tone_hz(uint16_t duration_us)
@@ -464,6 +446,9 @@ static void flipperham_send_hardcoded_message(FlipperHamApp* app)
 
     flipperham_radio_stop(app);
     furi_hal_power_suppress_charge_exit();
+
+
+flipperham_status_view_free(app);
 }
 
 int32_t flipperham_app(void* p)
@@ -472,10 +457,16 @@ int32_t flipperham_app(void* p)
 
     FlipperHamApp* app = flipperham_app_alloc();
 
-    view_dispatcher_run(app->view_dispatcher);
-    flipperham_menu_free(app);
+    while(1) 
+    {
+        app->send_requested = false;
+        view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewSubmenu);
+        view_dispatcher_run(app->view_dispatcher);
 
-    if(app->send_requested) {
+
+
+        if(!app->send_requested) break;
+
         flipperham_send_hardcoded_message(app);
     }
 
