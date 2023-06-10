@@ -9,6 +9,7 @@
 #include <cc1101_regs.h>
 #include <furi_hal_subghz_configs.h>
 #include <lib/toolbox/level_duration.h>
+#include <stm32wbxx_ll_dma.h>
 
 #include <stdio.h>
 
@@ -17,6 +18,10 @@
 #include "tools/3_aprs_packet.txt"
 
 #define SEG packet3_aprs_packet_durations_count
+#define FLIPPERHAM_PIN2_DMA             DMA2
+#define FLIPPERHAM_PIN2_DMA_CHANNEL     LL_DMA_CHANNEL_3
+#define FLIPPERHAM_PIN2_DMA_IRQ         FuriHalInterruptIdDma2Ch3
+#define FLIPPERHAM_PIN2_DMA_DEF         FLIPPERHAM_PIN2_DMA, FLIPPERHAM_PIN2_DMA_CHANNEL
 
 typedef struct {
     const char* name;
@@ -32,7 +37,7 @@ typedef struct {
 
 enum {
     FlipperHamPresetDefault = 0,
-    FlipperHamModemProfileDefault = 0,
+    FlipperHamModemProfileDefault = 1,
 };
 
 #define FLIPPERHAM_ASYNC_PRESET(NAME, MOD, DRATE3, DRATE4, DEV) \
@@ -108,6 +113,9 @@ static const FlipperHamModemProfile flipperham_modem_profiles[] = {
 static const FlipperHamPreset* flipperham_preset = &flipperham_presets[FlipperHamPresetDefault];
 static const FlipperHamModemProfile* flipperham_modem_profile =
     &flipperham_modem_profiles[FlipperHamModemProfileDefault];
+static uint32_t flipperham_pin2_dma_buffer[API_HAL_SUBGHZ_ASYNC_TX_BUFFER_FULL];
+static volatile uint16_t flipperham_pin2_dma_index = 0;
+static volatile bool flipperham_pin2_dma_running = false;
 
 static uint32_t flipperham_exit_callback(void* context) 
 {
@@ -168,24 +176,142 @@ static void flipperham_draw_callback(Canvas* canvas, void* context)
     snprintf(text, sizeof(text), "%u", app->current_tone_hz); canvas_draw_str_aligned(canvas, 64, 32, AlignCenter, AlignCenter, text);
 }
 
+static uint16_t flipperham_segment_tone_hz(uint16_t duration_us)
+{
+    if(duration_us >= 300) {
+        return flipperham_modem_profile->mark_hz;
+    }
+
+    return flipperham_modem_profile->space_hz;
+}
+
+static uint32_t flipperham_pin2_tone_word(uint16_t tone_hz)
+{
+    if(tone_hz == 1200) {
+        return (uint32_t)gpio_ext_pa7.pin << 16;
+    }
+
+    return gpio_ext_pa7.pin;
+}
+
+static void flipperham_pin2_fill(uint32_t* buffer, uint16_t count)
+{
+    while(count > 0) {
+        if(flipperham_pin2_dma_index < SEG) {
+            *buffer = flipperham_pin2_tone_word(
+                flipperham_segment_tone_hz(
+                    packet3_aprs_packet_durations_us[flipperham_pin2_dma_index]));
+            flipperham_pin2_dma_index++;
+        } else {
+            *buffer = (uint32_t)gpio_ext_pa7.pin << 16;
+        }
+
+        buffer++;
+        count--;
+    }
+}
+
+static void flipperham_pin2_dma_isr(void* context)
+{
+    UNUSED(context);
+
+    if(!flipperham_pin2_dma_running) {
+        return;
+    }
+
+#if FLIPPERHAM_PIN2_DMA_CHANNEL == LL_DMA_CHANNEL_3
+    if(LL_DMA_IsActiveFlag_HT3(FLIPPERHAM_PIN2_DMA)) {
+        LL_DMA_ClearFlag_HT3(FLIPPERHAM_PIN2_DMA);
+        flipperham_pin2_fill(
+            flipperham_pin2_dma_buffer,
+            API_HAL_SUBGHZ_ASYNC_TX_BUFFER_HALF);
+    }
+
+    if(LL_DMA_IsActiveFlag_TC3(FLIPPERHAM_PIN2_DMA)) {
+        LL_DMA_ClearFlag_TC3(FLIPPERHAM_PIN2_DMA);
+        flipperham_pin2_fill(
+            flipperham_pin2_dma_buffer + API_HAL_SUBGHZ_ASYNC_TX_BUFFER_HALF,
+            API_HAL_SUBGHZ_ASYNC_TX_BUFFER_HALF);
+    }
+#else
+#error Update this code. Would you kindly?
+#endif
+}
+
+static void flipperham_pin2_start(void)
+{
+    LL_DMA_InitTypeDef dma_config = {0};
+
+    flipperham_pin2_dma_index = 0;
+    flipperham_pin2_dma_running = true;
+
+    furi_hal_gpio_write(&gpio_ext_pa7, false);
+    furi_hal_gpio_init(&gpio_ext_pa7, GpioModeOutputPushPull, GpioPullNo, GpioSpeedVeryHigh);
+
+    flipperham_pin2_fill(
+        flipperham_pin2_dma_buffer,
+        API_HAL_SUBGHZ_ASYNC_TX_BUFFER_FULL);
+
+    furi_hal_interrupt_set_isr(FLIPPERHAM_PIN2_DMA_IRQ, flipperham_pin2_dma_isr, NULL);
+
+    dma_config.PeriphOrM2MSrcAddress = (uint32_t)&(gpio_ext_pa7.port->BSRR);
+    dma_config.MemoryOrM2MDstAddress = (uint32_t)flipperham_pin2_dma_buffer;
+    dma_config.Direction = LL_DMA_DIRECTION_MEMORY_TO_PERIPH;
+    dma_config.Mode = LL_DMA_MODE_CIRCULAR;
+    dma_config.PeriphOrM2MSrcIncMode = LL_DMA_PERIPH_NOINCREMENT;
+    dma_config.MemoryOrM2MDstIncMode = LL_DMA_MEMORY_INCREMENT;
+    dma_config.PeriphOrM2MSrcDataSize = LL_DMA_PDATAALIGN_WORD;
+    dma_config.MemoryOrM2MDstDataSize = LL_DMA_MDATAALIGN_WORD;
+    dma_config.NbData = API_HAL_SUBGHZ_ASYNC_TX_BUFFER_FULL;
+    dma_config.PeriphRequest = LL_DMAMUX_REQ_TIM2_UP;
+    dma_config.Priority = LL_DMA_PRIORITY_HIGH;
+    LL_DMA_Init(FLIPPERHAM_PIN2_DMA_DEF, &dma_config);
+    LL_DMA_EnableIT_HT(FLIPPERHAM_PIN2_DMA_DEF);
+    LL_DMA_EnableIT_TC(FLIPPERHAM_PIN2_DMA_DEF);
+    LL_DMA_EnableChannel(FLIPPERHAM_PIN2_DMA_DEF);
+}
+
+static void flipperham_pin2_stop(void)
+{
+    flipperham_pin2_dma_running = false;
+    LL_DMA_DisableChannel(FLIPPERHAM_PIN2_DMA_DEF);
+    LL_DMA_DisableIT_HT(FLIPPERHAM_PIN2_DMA_DEF);
+    LL_DMA_DisableIT_TC(FLIPPERHAM_PIN2_DMA_DEF);
+#if FLIPPERHAM_PIN2_DMA_CHANNEL == LL_DMA_CHANNEL_3
+    if(LL_DMA_IsActiveFlag_HT3(FLIPPERHAM_PIN2_DMA)) {
+        LL_DMA_ClearFlag_HT3(FLIPPERHAM_PIN2_DMA);
+    }
+
+    if(LL_DMA_IsActiveFlag_TC3(FLIPPERHAM_PIN2_DMA)) {
+        LL_DMA_ClearFlag_TC3(FLIPPERHAM_PIN2_DMA);
+    }
+#endif
+    LL_DMA_DeInit(FLIPPERHAM_PIN2_DMA_DEF);
+    furi_hal_interrupt_set_isr(FLIPPERHAM_PIN2_DMA_IRQ, NULL, NULL);
+    furi_hal_gpio_write(&gpio_ext_pa7, false);
+    furi_hal_gpio_init_simple(&gpio_ext_pa7, GpioModeAnalog);
+}
+
 static void flipperham_load_first_segment(FlipperHamApp* app) 
 {
     app->segment_index = 0;
     app->level = !packet3_aprs_packet_start_level;
     app->tx_done = false;
-    app->current_tone_hz = flipperham_modem_profile->mark_hz;
     app->current_half_period_us = packet3_aprs_packet_durations_us[0];
+    app->current_tone_hz = flipperham_segment_tone_hz(app->current_half_period_us);
 }
 
 static LevelDuration flipperham_yield(void* context) 
 {
     FlipperHamApp* app = context;
     LevelDuration level_duration;
+    uint16_t duration_us;
 
     if(app->tx_done) return level_duration_reset();
-    
 
-    level_duration = level_duration_make(app->level, app->current_half_period_us);
+    duration_us = app->current_half_period_us;
+    app->current_tone_hz = flipperham_segment_tone_hz(duration_us);
+    level_duration = level_duration_make(app->level, duration_us);
     app->level = !app->level;
     app->segment_index++;
     if(app->segment_index >= SEG) {
@@ -219,6 +345,7 @@ static void flipperham_radio_start(FlipperHamApp* app)
 static void flipperham_radio_stop(FlipperHamApp* app) 
 {
     if(app->tx_started) furi_hal_subghz_stop_async_tx();
+    flipperham_pin2_stop();
     furi_hal_subghz_sleep();
 }
 
@@ -301,6 +428,7 @@ static void flipperham_send_hardcoded_message(FlipperHamApp* app)
     view_port_update(app->view_port);
 
     furi_hal_power_suppress_charge_enter();
+    flipperham_pin2_start();
     flipperham_radio_start(app);
 
     while(!app->tx_done) {
