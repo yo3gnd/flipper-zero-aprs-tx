@@ -126,6 +126,10 @@ typedef struct
     bool send_requested;
     uint8_t encoding_index;
     Packet* pkt;
+    uint16_t* wave;
+    uint16_t wave_n;
+    int16_t wave_c;
+    bool wave_mark;
     FlipperHamRuntimeTx tx;
 } FlipperHamApp;
 
@@ -335,9 +339,65 @@ static void flipperham_load_first_segment(FlipperHamApp* app)
     app->current_tone_hz = flipperham_segment_tone_hz(app->current_half_period_us);
 }
 
+static bool add(FlipperHamApp* app, uint16_t a)
+{
+    int32_t b;
+
+    if(!app->wave) return false;
+    /* cap generated edges */
+    if(app->wave_n >= 4096) return false;
+
+    b = a + app->wave_c;
+    a = (b + 16) / 33;
+    app->wave_c = b - ((int32_t)a * 33);
+    if(!a) return true;
+
+    app->wave[app->wave_n++] = a;
+    return true;
+}
+
+static bool put(FlipperHamApp* app, uint8_t bit)
+{
+    if(bit == 0) app->wave_mark = !app->wave_mark;
+
+    if(app->wave_mark)
+    {
+        if(!add(app, 13750)) return false;
+        if(!add(app, 13750)) return false;
+    }
+    else
+    {
+        if(!add(app, 7500)) return false;
+        if(!add(app, 7500)) return false;
+        if(!add(app, 7500)) return false;
+        if(!add(app, 5000)) return false;
+    }
+
+    return true;
+}
+
+static bool flag3(FlipperHamApp* app)
+{
+    static const uint8_t a[] = {0, 1, 1, 1, 1, 1, 1, 0};
+    uint8_t i;
+
+    for(i = 0; i < sizeof(a); i++) {
+        if(!put(app, a[i])) return false;
+    }
+
+    return true;
+}
+
 static void txstart(FlipperHamApp* app)
 {
+    uint16_t i;
+
     app->tx_done = false;
+    app->segment_index = 0;
+    app->level = !packet3_aprs_packet_start_level;
+    app->wave_n = 0;
+    app->wave_c = 0;
+    app->wave_mark = true;
     app->tx.bits = NULL;
     app->tx.bits_n = 0;
     app->tx.i = 0;
@@ -356,13 +416,33 @@ static void txstart(FlipperHamApp* app)
       app->tx.part[3] = 0;
 
     if(!app->pkt) return;
+    if(!app->wave) return;
 
     packet_do_all(app->pkt, "YO0FLP", 0, "W0RLD", 0, "Hello world, I am Flipper Zero :D");
 
-    app->tx.bits = app->pkt->nrzi;
-    app->tx.bits_n = app->pkt->nrzi_len;
+    // 50ms mark
+    for(i = 0; i < 60 && put(app, 1); i++);
+
+    // preamble
+    for(i = 0; i < 50; i++) if(!flag3(app)) break;
+
+    // skip the flag at head and tail, add our own
+    for(i = 8; i + 8 < app->pkt->stuffed_len; i++) {
+        if(!put(app, app->pkt->stuffed[i])) break;
+    }
+
+    // post
+    for(i = 0; i < 3; i++) if(!flag3(app)) break;
+
+    if(app->wave_n) {
+        app->current_half_period_us = app->wave[0];
+        app->current_tone_hz = flipperham_segment_tone_hz(app->current_half_period_us);
+    } else {
+        app->tx_done = true;
+    }
 }
 
+#if 0
 static void txnext(FlipperHamApp* app)
 {
     uint8_t b;
@@ -407,26 +487,15 @@ static void txnext(FlipperHamApp* app)
     app->tx.half_left_us = 0;
     app->tx.bit_left_us = 833;
 }
+#endif
 
 static LevelDuration edge_yield(void* context) 
 {
     FlipperHamApp* app = context;
     LevelDuration ld;
     uint16_t a;
-    int32_t b;
 
     if(app->tx_done) return level_duration_reset();
-
-    if(!app->tx.bits || !app->tx.bits_n)
-    {
-        app->tx_done = true;
-        return level_duration_reset();
-    }
-
-    if(app->tx.n >= app->tx.k) {
-            txnext(app);
-        if(app->tx_done) return level_duration_reset();
-    }
 
     /*
     a = app->current_half_period_us;
@@ -434,21 +503,21 @@ static LevelDuration edge_yield(void* context)
     ld = level_duration_make(app->level, a);
     */
 
-    a = app->tx.part[app->tx.n];
-    b = a + app->tx.c;
-    a = (b + 16) / 33;
-    app->tx.c = b - ((int32_t)a * 33);
+    if(app->segment_index >= app->wave_n) {
+        app->tx_done = true;
+        return level_duration_reset();
+    }
+
+    a = app->wave[app->segment_index];
 
     app->current_half_period_us = a;
-    ld = level_duration_make(app->tx.level, a);
+    app->current_tone_hz = flipperham_segment_tone_hz(a);
+    ld = level_duration_make(app->level, a);
 
-    app->tx.level = !app->tx.level;
-    app->tx.n++;
+    app->level = !app->level;
+    app->segment_index++;
 
-    if(app->tx.n >= app->tx.k) {
-            app->tx.i++;
-        if(app->tx.i >= app->tx.bits_n) app->tx_done = true;
-    }
+    if(app->segment_index >= app->wave_n) app->tx_done = true;
 
     return ld;
 }
@@ -494,6 +563,7 @@ static FlipperHamApp* flipperham_app_alloc(void) {
         app->send_requested = false;
         app->encoding_index = FlipperHamModemProfileDefault;
         app->pkt = malloc(sizeof(Packet));
+        app->wave = malloc(sizeof(uint16_t) * 4096);
 
     view_dispatcher_enable_queue( app->view_dispatcher);
     view_dispatcher_attach_to_gui(app->view_dispatcher, app->gui, ViewDispatcherTypeFullscreen);
@@ -562,7 +632,6 @@ static void flipperham_app_free(FlipperHamApp* app)
 static void flipperham_send_hardcoded_message(FlipperHamApp* app) 
 {
     txstart(app);
-    txnext(app);
     /* flipperham_load_first_segment(app); // old table */
     app->tx_started = false;
     app->tx_allowed = true;
