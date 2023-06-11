@@ -9,6 +9,7 @@
 #include <cc1101_regs.h>
 #include <furi_hal_subghz_configs.h>
 #include <lib/toolbox/level_duration.h>
+#include <storage/storage.h>
 #include <stm32wbxx_ll_dma.h>
 
 #include <stdio.h>
@@ -130,6 +131,7 @@ typedef struct
     uint16_t wave_n;
     int16_t wave_c;
     bool wave_mark;
+    uint16_t dump_n;
     FlipperHamRuntimeTx tx;
 } FlipperHamApp;
 
@@ -388,6 +390,58 @@ static bool flag3(FlipperHamApp* app)
     return true;
 }
 
+static void dump(FlipperHamApp* app)
+{
+    Storage* storage;
+    File* file;
+
+    char path[64];
+    char line[96];
+    
+    int n;
+    
+    uint16_t i;
+
+    if(!app->wave) return;
+    if(!app->wave_n) return;
+
+    storage = furi_record_open(RECORD_STORAGE);
+    file = storage_file_alloc(storage);
+
+      storage_common_mkdir(storage, "/ext/apps_data");
+      storage_common_mkdir(storage, "/ext/apps_data/aprstx");
+
+      snprintf(path, sizeof(path), "/ext/apps_data/aprstx/pulses_%03u.txt", app->dump_n);
+      app->dump_n++;
+
+    if(storage_file_open(file, path, FSAM_WRITE, FSOM_CREATE_ALWAYS) ) 
+    {
+        n = snprintf(line, sizeof(line), "# aprstx pulses\n# count %u\n", app->wave_n);
+        if(n > 0) storage_file_write(file, line, n);
+
+        n = snprintf(line, sizeof(line), "# src YO0FLP-0\n# dst W0RLD-0\n");
+        if(n > 0) storage_file_write(file, line, n);
+
+        n = snprintf(line, sizeof(line), "# msg >Hello world, I am Flipper Zero :D\n");
+        if(n > 0) storage_file_write(file, line, n);
+
+        for(i = 0; i < app->wave_n; i++) 
+        {
+            n = snprintf(line, sizeof(line), "%u %u\n", i, app->wave[i]);
+            if(n > 0) storage_file_write(file, line, n);
+        }
+    }
+
+
+
+
+    storage_file_close(file);
+
+
+    storage_file_free(file);
+    furi_record_close(RECORD_STORAGE);
+}
+
 static void txstart(FlipperHamApp* app)
 {
     uint16_t i;
@@ -564,6 +618,7 @@ static FlipperHamApp* flipperham_app_alloc(void) {
         app->encoding_index = FlipperHamModemProfileDefault;
         app->pkt = malloc(sizeof(Packet));
         app->wave = malloc(sizeof(uint16_t) * 4096);
+        app->dump_n = 0;
 
     view_dispatcher_enable_queue( app->view_dispatcher);
     view_dispatcher_attach_to_gui(app->view_dispatcher, app->gui, ViewDispatcherTypeFullscreen);
@@ -633,6 +688,7 @@ static void flipperham_app_free(FlipperHamApp* app)
 static void flipperham_send_hardcoded_message(FlipperHamApp* app) 
 {
     txstart(app);
+    dump(app);
     /* flipperham_load_first_segment(app); // old table */
     app->tx_started = false;
     app->tx_allowed = true;
