@@ -125,6 +125,8 @@ typedef struct
     volatile bool tx_allowed;
     bool send_requested;
     uint8_t encoding_index;
+    uint8_t msg_n;
+    uint8_t src_ssid;
     Packet* pkt;
     uint16_t* wave;
     uint16_t wave_n;
@@ -390,6 +392,7 @@ static bool flag3(FlipperHamApp* app)
 
 static void txstart(FlipperHamApp* app)
 {
+    char s[64];
     uint16_t i;
 
     app->tx_done = false;
@@ -418,7 +421,14 @@ static void txstart(FlipperHamApp* app)
     if(!app->pkt) return;
     if(!app->wave) return;
 
-    packet_do_all(app->pkt, "YO0FLP", 0, "W0RLD", 0, "Hello world, I am Flipper Zero :D");
+    snprintf(s, sizeof(s), "Hello world, I am Flipper Zero :D msg %02u", app->msg_n);
+    packet_do_all(app->pkt, "YO0FLP", app->src_ssid, "W0RLD", 0, s);
+
+    app->msg_n++;
+    if(app->msg_n > 99) app->msg_n = 0;
+
+    app->src_ssid++;
+    if(app->src_ssid > 3) app->src_ssid = 0;
 
     // 50ms mark
     for(i = 0; i < 60 && put(app, 1); i++);
@@ -562,6 +572,8 @@ static FlipperHamApp* flipperham_app_alloc(void) {
         app->tx_done = false;
         app->send_requested = false;
         app->encoding_index = FlipperHamModemProfileDefault;
+        app->msg_n = 0;
+        app->src_ssid = 0;
         app->pkt = malloc(sizeof(Packet));
         app->wave = malloc(sizeof(uint16_t) * 4096);
 
