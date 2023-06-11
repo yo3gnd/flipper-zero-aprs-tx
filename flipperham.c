@@ -625,6 +625,7 @@ static void flipperham_app_free(FlipperHamApp* app)
     flipperham_status_view_free(app);
     flipperham_menu_free(app);
     if(app->pkt) free(app->pkt);
+    if(app->wave) free(app->wave);
     if(app->gui) furi_record_close(RECORD_GUI);
     free(app);
 }
