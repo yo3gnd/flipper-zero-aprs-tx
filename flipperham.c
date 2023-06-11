@@ -56,11 +56,15 @@ typedef struct {
     const uint8_t* bits;
     uint16_t bits_n;
     uint16_t i;
+    uint8_t k;
+    uint8_t n;
+    int16_t c;
     bool mark;
     bool level;
     uint16_t half_us;
     uint16_t half_left_us;
     uint16_t bit_left_us;
+    uint16_t part[4];
 } FlipperHamRuntimeTx;
 
 void packet_do_all(Packet* p, const char* from, uint8_t from_ssid, const char* to, uint8_t to_ssid, const char* s);
@@ -271,6 +275,9 @@ static void flipperham_pin2_dma_isr(void* context)
 
 static void flipperham_pin2_start(void)
 {
+    /* off for now */
+    return;
+
     LL_DMA_InitTypeDef dma_config = {0};
 
     flipperham_pin2_dma_index = 0;
@@ -304,6 +311,9 @@ static void flipperham_pin2_start(void)
 
 static void flipperham_pin2_stop(void)
 {
+    /* off for now */
+    return;
+
     flipperham_pin2_dma_running = false;
     LL_DMA_DisableChannel(FLIPPERHAM_PIN2_DMA_DEF);
     LL_DMA_DisableIT_HT(FLIPPERHAM_PIN2_DMA_DEF);
@@ -327,15 +337,23 @@ static void flipperham_load_first_segment(FlipperHamApp* app)
 
 static void txstart(FlipperHamApp* app)
 {
+    app->tx_done = false;
     app->tx.bits = NULL;
     app->tx.bits_n = 0;
     app->tx.i = 0;
+    app->tx.k = 0;
+    app->tx.n = 0;
+    app->tx.c = 0;
     app->tx.mark = true;
     app->tx.level = !packet3_aprs_packet_start_level;
     app->tx.half_us = 0;
 
       app->tx.half_left_us = 0; // no
       app->tx.bit_left_us = 0;
+      app->tx.part[0] = 0;
+      app->tx.part[1] = 0;
+      app->tx.part[2] = 0;
+      app->tx.part[3] = 0;
 
     if(!app->pkt) return;
 
@@ -347,8 +365,6 @@ static void txstart(FlipperHamApp* app)
 
 static void txnext(FlipperHamApp* app)
 {
-    const FlipperHamModemProfile* m = &flipperham_modem_profiles[FlipperHamModemProfileDefault];
-    uint32_t a;
     uint8_t b;
 
         if(app->tx.i >= app->tx.bits_n) {
@@ -365,25 +381,39 @@ static void txnext(FlipperHamApp* app)
         if(b != app->tx.bits[app->tx.i - 1]) app->tx.mark = !app->tx.mark;
     }
 
-    a = app->tx.mark ? m->mark_hz : m->space_hz;
-    app->current_tone_hz = a;
-    app->tx.half_us = 1000000UL / (a * 2UL);
-    if(!app->tx.half_us) app->tx.half_us = 1;
+    app->tx.n = 0;
 
-    app->tx.half_left_us = app->tx.half_us;
-    app->tx.bit_left_us = 1000000UL / m->baud;
+    /* 1200 mark must be 417+416, not 416+416+1 */
+    if(app->tx.mark) 
+    {
+        app->current_tone_hz = 1200;
+        app->tx.k = 2;
+        app->tx.part[0] = 13750;
+        app->tx.part[1] = 13750;
+        app->tx.part[2] = 0;
+        app->tx.part[3] = 0;
+    }
+    else
+    {
+        app->current_tone_hz = 2200;
+        app->tx.k = 4;
+        app->tx.part[0] = 7500;
+        app->tx.part[1] = 7500;
+        app->tx.part[2] = 7500;
+        app->tx.part[3] = 5000;
+    }
+
+    app->tx.half_us = 0;
+    app->tx.half_left_us = 0;
+    app->tx.bit_left_us = 833;
 }
 
 static LevelDuration edge_yield(void* context) 
 {
     FlipperHamApp* app = context;
     LevelDuration ld;
-
-
-
-
     uint16_t a;
-    uint16_t b;
+    int32_t b;
 
     if(app->tx_done) return level_duration_reset();
 
@@ -393,7 +423,7 @@ static LevelDuration edge_yield(void* context)
         return level_duration_reset();
     }
 
-    if(!app->tx.bit_left_us) {
+    if(app->tx.n >= app->tx.k) {
             txnext(app);
         if(app->tx_done) return level_duration_reset();
     }
@@ -404,28 +434,20 @@ static LevelDuration edge_yield(void* context)
     ld = level_duration_make(app->level, a);
     */
 
-    a = app->tx.half_left_us;
-    b = app->tx.bit_left_us;
-    if(a > b) a = b;
+    a = app->tx.part[app->tx.n];
+    b = a + app->tx.c;
+    a = (b + 16) / 33;
+    app->tx.c = b - ((int32_t)a * 33);
 
     app->current_half_period_us = a;
     ld = level_duration_make(app->tx.level, a);
 
-    app->tx.half_left_us -= a;
-    app->tx.bit_left_us -= a;
+    app->tx.level = !app->tx.level;
+    app->tx.n++;
 
-
-        if(!app->tx.half_left_us) 
-        {
-            app->tx.level = !app->tx.level;
-            app->tx.half_left_us = app->tx.half_us;
-        }
-
-    if(!app->tx.bit_left_us)
-    {
-        app->tx.i++;
-
-            if(app->tx.i >= app->tx.bits_n) app->tx_done = true;
+    if(app->tx.n >= app->tx.k) {
+            app->tx.i++;
+        if(app->tx.i >= app->tx.bits_n) app->tx_done = true;
     }
 
     return ld;
