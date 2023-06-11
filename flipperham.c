@@ -106,7 +106,8 @@ FLIPPERHAM_ASYNC_PRESET(flipperham_preset_2fsk_dev5_16khz_async_regs, 0x04, 0x83
 FLIPPERHAM_ASYNC_PRESET(flipperham_preset_gfsk_dev5_16khz_async_regs, 0x14, 0x83, 0x67, 0x15)
 FLIPPERHAM_ASYNC_PRESET(flipperham_preset_gfsk_dev5_16khz_fast_async_regs, 0x14, 0x93, 0xC8, 0x15)
 
-typedef struct {
+typedef struct 
+{
     Gui* gui;
     ViewDispatcher* view_dispatcher;
     VariableItemList* variable_item_list;
@@ -124,22 +125,26 @@ typedef struct {
     FlipperHamRuntimeTx tx;
 } FlipperHamApp;
 
-enum {
+enum 
+{
     FlipperHamViewSubmenu = 0,
 };
 
-enum {
+enum 
+{
     FlipperHamMenuIndexSend = 0,
     FlipperHamMenuIndexEncoding,
 };
 
-static const FlipperHamPreset flipperham_presets[] = {
+static const FlipperHamPreset flipperham_presets[] = 
+{
     { "2FSK 5.16", flipperham_preset_2fsk_dev5_16khz_async_regs },
     { "GFSK 4.8", flipperham_preset_gfsk_dev5_16khz_async_regs },
     { "GFSK 9.99", flipperham_preset_gfsk_dev5_16khz_fast_async_regs },
 };
 
-static const FlipperHamModemProfile flipperham_modem_profiles[] = {
+static const FlipperHamModemProfile flipperham_modem_profiles[] =
+{
     { "300bd", 300, 1600, 1800 },
     { "1200bd", 1200, 1200, 2200 },
 };
@@ -147,7 +152,8 @@ static const FlipperHamModemProfile flipperham_modem_profiles[] = {
 static const FlipperHamPreset* flipperham_preset = &flipperham_presets[FlipperHamPresetDefault];
 static const FlipperHamModemProfile* flipperham_modem_profile =
     &flipperham_modem_profiles[FlipperHamModemProfileDefault];
-static const char* flipperham_encoding_text[] = {
+static const char* flipperham_encoding_text[] = 
+{
     "300 bd",
     "1200 bd",
 };
@@ -302,13 +308,8 @@ static void flipperham_pin2_stop(void)
     LL_DMA_DisableChannel(FLIPPERHAM_PIN2_DMA_DEF);
     LL_DMA_DisableIT_HT(FLIPPERHAM_PIN2_DMA_DEF);
     LL_DMA_DisableIT_TC(FLIPPERHAM_PIN2_DMA_DEF);
-    if(LL_DMA_IsActiveFlag_HT3(FLIPPERHAM_PIN2_DMA)) {
-        LL_DMA_ClearFlag_HT3(FLIPPERHAM_PIN2_DMA);
-    }
-
-    if(LL_DMA_IsActiveFlag_TC3(FLIPPERHAM_PIN2_DMA)) {
-        LL_DMA_ClearFlag_TC3(FLIPPERHAM_PIN2_DMA);
-    }
+    if(LL_DMA_IsActiveFlag_HT3(FLIPPERHAM_PIN2_DMA)) LL_DMA_ClearFlag_HT3(FLIPPERHAM_PIN2_DMA);
+    if(LL_DMA_IsActiveFlag_TC3(FLIPPERHAM_PIN2_DMA)) LL_DMA_ClearFlag_TC3(FLIPPERHAM_PIN2_DMA);
     LL_DMA_DeInit(FLIPPERHAM_PIN2_DMA_DEF);
     furi_hal_interrupt_set_isr(FLIPPERHAM_PIN2_DMA_IRQ, NULL, NULL);
     furi_hal_gpio_write(&gpio_ext_pa7, false);
@@ -324,19 +325,17 @@ static void flipperham_load_first_segment(FlipperHamApp* app)
     app->current_tone_hz = flipperham_segment_tone_hz(app->current_half_period_us);
 }
 
-static void flipperham_load_runtime(FlipperHamApp* app)
+static void txstart(FlipperHamApp* app)
 {
-    const FlipperHamModemProfile* m = &flipperham_modem_profiles[app->encoding_index];
-    uint32_t hz;
-
     app->tx.bits = NULL;
     app->tx.bits_n = 0;
     app->tx.i = 0;
     app->tx.mark = true;
     app->tx.level = !packet3_aprs_packet_start_level;
     app->tx.half_us = 0;
-    app->tx.half_left_us = 0;
-    app->tx.bit_left_us = 0;
+
+      app->tx.half_left_us = 0; // no
+      app->tx.bit_left_us = 0;
 
     if(!app->pkt) return;
 
@@ -344,36 +343,92 @@ static void flipperham_load_runtime(FlipperHamApp* app)
 
     app->tx.bits = app->pkt->nrzi;
     app->tx.bits_n = app->pkt->nrzi_len;
-    if(!app->tx.bits_n) return;
+}
 
-    app->tx.mark = app->tx.bits[0] ? true : false;
-    hz = app->tx.mark ? m->mark_hz : m->space_hz;
-    app->tx.half_us = 1000000UL / (hz * 2UL);
+static void txnext(FlipperHamApp* app)
+{
+    const FlipperHamModemProfile* m = &flipperham_modem_profiles[FlipperHamModemProfileDefault];
+    uint32_t a;
+    uint8_t b;
+
+        if(app->tx.i >= app->tx.bits_n) {
+            app->tx_done = true;
+            return;
+        }
+
+    b = app->tx.bits[app->tx.i];
+
+    /* NRZI edge = flip at bit start */
+    if(app->tx.i == 0) {
+        if(b != 1) app->tx.mark = !app->tx.mark;
+    } else {
+        if(b != app->tx.bits[app->tx.i - 1]) app->tx.mark = !app->tx.mark;
+    }
+
+    a = app->tx.mark ? m->mark_hz : m->space_hz;
+    app->current_tone_hz = a;
+    app->tx.half_us = 1000000UL / (a * 2UL);
     if(!app->tx.half_us) app->tx.half_us = 1;
+
     app->tx.half_left_us = app->tx.half_us;
     app->tx.bit_left_us = 1000000UL / m->baud;
 }
 
-static LevelDuration flipperham_yield(void* context) 
+static LevelDuration edge_yield(void* context) 
 {
     FlipperHamApp* app = context;
-    LevelDuration level_duration;
-    uint16_t duration_us;
+    LevelDuration ld;
+
+
+
+
+    uint16_t a;
+    uint16_t b;
 
     if(app->tx_done) return level_duration_reset();
 
-    duration_us = app->current_half_period_us;
-    app->current_tone_hz = flipperham_segment_tone_hz(duration_us);
-    level_duration = level_duration_make(app->level, duration_us);
-    app->level = !app->level;
-    app->segment_index++;
-    if(app->segment_index >= SEG) {
+    if(!app->tx.bits || !app->tx.bits_n)
+    {
         app->tx_done = true;
-    } else {
-        app->current_half_period_us = packet3_aprs_packet_durations_us[app->segment_index];
+        return level_duration_reset();
     }
 
-    return level_duration;
+    if(!app->tx.bit_left_us) {
+            txnext(app);
+        if(app->tx_done) return level_duration_reset();
+    }
+
+    /*
+    a = app->current_half_period_us;
+    app->current_tone_hz = flipperham_segment_tone_hz(a);
+    ld = level_duration_make(app->level, a);
+    */
+
+    a = app->tx.half_left_us;
+    b = app->tx.bit_left_us;
+    if(a > b) a = b;
+
+    app->current_half_period_us = a;
+    ld = level_duration_make(app->tx.level, a);
+
+    app->tx.half_left_us -= a;
+    app->tx.bit_left_us -= a;
+
+
+        if(!app->tx.half_left_us) 
+        {
+            app->tx.level = !app->tx.level;
+            app->tx.half_left_us = app->tx.half_us;
+        }
+
+    if(!app->tx.bit_left_us)
+    {
+        app->tx.i++;
+
+            if(app->tx.i >= app->tx.bits_n) app->tx_done = true;
+    }
+
+    return ld;
 }
 
 static void flipperham_radio_start(FlipperHamApp* app) 
@@ -390,7 +445,7 @@ static void flipperham_radio_start(FlipperHamApp* app)
         return;
     }
 
-    app->tx_allowed = furi_hal_subghz_start_async_tx(flipperham_yield, app);
+    app->tx_allowed = furi_hal_subghz_start_async_tx(edge_yield, app);
     app->tx_started = app->tx_allowed;
     if(!app->tx_allowed) app->tx_done = true;
 }
@@ -484,8 +539,9 @@ static void flipperham_app_free(FlipperHamApp* app)
 
 static void flipperham_send_hardcoded_message(FlipperHamApp* app) 
 {
-    flipperham_load_runtime(app);
-    flipperham_load_first_segment(app);
+    txstart(app);
+    txnext(app);
+    /* flipperham_load_first_segment(app); // old table */
     app->tx_started = false;
     app->tx_allowed = true;
 
