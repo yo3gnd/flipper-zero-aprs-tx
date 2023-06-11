@@ -35,6 +35,36 @@ typedef struct {
     uint16_t space_hz;
 } FlipperHamModemProfile;
 
+typedef struct {
+    uint8_t payload[96];
+    uint16_t payload_len;
+
+    uint8_t ax25[192];
+    uint16_t ax25_len;
+
+    uint8_t fcs[194];
+    uint16_t fcs_len;
+
+    uint8_t stuffed[1800];
+    uint16_t stuffed_len;
+
+    uint8_t nrzi[1800];
+    uint16_t nrzi_len;
+} Packet;
+
+typedef struct {
+    const uint8_t* bits;
+    uint16_t bits_n;
+    uint16_t i;
+    bool mark;
+    bool level;
+    uint16_t half_us;
+    uint16_t half_left_us;
+    uint16_t bit_left_us;
+} FlipperHamRuntimeTx;
+
+void packet_do_all(Packet* p, const char* from, uint8_t from_ssid, const char* to, uint8_t to_ssid, const char* s);
+
 enum {
     FlipperHamPresetDefault = 0,
     FlipperHamModemProfileDefault = 1,
@@ -90,6 +120,8 @@ typedef struct {
     volatile bool tx_allowed;
     bool send_requested;
     uint8_t encoding_index;
+    Packet* pkt;
+    FlipperHamRuntimeTx tx;
 } FlipperHamApp;
 
 enum {
@@ -292,6 +324,36 @@ static void flipperham_load_first_segment(FlipperHamApp* app)
     app->current_tone_hz = flipperham_segment_tone_hz(app->current_half_period_us);
 }
 
+static void flipperham_load_runtime(FlipperHamApp* app)
+{
+    const FlipperHamModemProfile* m = &flipperham_modem_profiles[app->encoding_index];
+    uint32_t hz;
+
+    app->tx.bits = NULL;
+    app->tx.bits_n = 0;
+    app->tx.i = 0;
+    app->tx.mark = true;
+    app->tx.level = !packet3_aprs_packet_start_level;
+    app->tx.half_us = 0;
+    app->tx.half_left_us = 0;
+    app->tx.bit_left_us = 0;
+
+    if(!app->pkt) return;
+
+    packet_do_all(app->pkt, "YO0FLP", 0, "W0RLD", 0, "Hello world, I am Flipper Zero :D");
+
+    app->tx.bits = app->pkt->nrzi;
+    app->tx.bits_n = app->pkt->nrzi_len;
+    if(!app->tx.bits_n) return;
+
+    app->tx.mark = app->tx.bits[0] ? true : false;
+    hz = app->tx.mark ? m->mark_hz : m->space_hz;
+    app->tx.half_us = 1000000UL / (hz * 2UL);
+    if(!app->tx.half_us) app->tx.half_us = 1;
+    app->tx.half_left_us = app->tx.half_us;
+    app->tx.bit_left_us = 1000000UL / m->baud;
+}
+
 static LevelDuration flipperham_yield(void* context) 
 {
     FlipperHamApp* app = context;
@@ -354,6 +416,7 @@ static FlipperHamApp* flipperham_app_alloc(void) {
         app->tx_done = false;
         app->send_requested = false;
         app->encoding_index = FlipperHamModemProfileDefault;
+        app->pkt = malloc(sizeof(Packet));
 
     view_dispatcher_enable_queue( app->view_dispatcher);
     view_dispatcher_attach_to_gui(app->view_dispatcher, app->gui, ViewDispatcherTypeFullscreen);
@@ -414,12 +477,14 @@ static void flipperham_app_free(FlipperHamApp* app)
 
     flipperham_status_view_free(app);
     flipperham_menu_free(app);
+    if(app->pkt) free(app->pkt);
     if(app->gui) furi_record_close(RECORD_GUI);
     free(app);
 }
 
 static void flipperham_send_hardcoded_message(FlipperHamApp* app) 
 {
+    flipperham_load_runtime(app);
     flipperham_load_first_segment(app);
     app->tx_started = false;
     app->tx_allowed = true;
