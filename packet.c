@@ -21,11 +21,17 @@ typedef struct {
 static void packet_addr(uint8_t* out, const char* call, uint8_t ssid, uint8_t last)
 {
     int i;
+    const char* s = call;
+
 
     for(i = 0; i < 6; i++) 
     {
-        if(call[i]) out[i] = ((uint8_t)call[i]) << 1;
-        else out[i] = ' ' << 1;
+        // don't go past short calls; add spaces
+          if(*s) {
+              out[i] = ((uint8_t)*s) << 1;
+              s++;
+          }
+          else out[i] = ' ' << 1;
     }
 
     out[6] = 0x60 | ((ssid & 15) << 1) | (last ? 1 : 0);
