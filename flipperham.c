@@ -584,10 +584,10 @@ static void flipperham_send_hardcoded_message(FlipperHamApp* app)
         furi_delay_ms(20);
     }
 
+
+        flipperham_radio_stop(app); // do it before 
     view_port_update(app->view_port);
     furi_delay_ms(750);
-
-    flipperham_radio_stop(app);
     furi_hal_power_suppress_charge_exit();
 
 
