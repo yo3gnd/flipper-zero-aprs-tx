@@ -137,6 +137,7 @@ typedef struct
     ViewDispatcher* view_dispatcher;
     Submenu* submenu;
     Submenu* send_menu;
+    Submenu* bulletin_menu;
     ViewPort* view_port;
     volatile uint16_t current_tone_hz;
     volatile uint16_t current_half_period_us;
@@ -171,6 +172,7 @@ enum
 {
     FlipperHamViewMenu = 0,
     FlipperHamViewSend,
+    FlipperHamViewBulletin,
 };
 
 enum 
@@ -184,6 +186,12 @@ enum
     FlipperHamSendIndexStatus,
     FlipperHamSendIndexBulletin,
     FlipperHamSendIndexSettings,
+};
+
+enum
+{
+    FlipperHamBulletinIndexAdd = 0,
+    FlipperHamBulletinIndexBase = 100,
 };
 
 static const FlipperHamPreset flipperham_presets[] = 
@@ -211,8 +219,18 @@ static uint32_t flipperham_exit_callback(void* context)
 static uint32_t flipperham_send_exit_callback(void* context) 
 {
     UNUSED(context);
+
     return FlipperHamViewMenu;
 }
+
+static uint32_t flipperham_bulletin_exit_callback(void* context) 
+{
+    UNUSED(context);
+
+    return FlipperHamViewSend;
+}
+
+static void flipperham_bulletin_callback(void* context, uint32_t index);
 
 static void cfgdefs(FlipperHamApp* app)
 {
@@ -364,15 +382,36 @@ static void flipperham_menu_callback(void* context, uint32_t index)
 
 }
 
+static void flipperham_bulletin_menu_reload(FlipperHamApp* app)
+{
+    uint8_t i;
+
+    submenu_reset(app->bulletin_menu);
+    submenu_add_item( app->bulletin_menu, "Add new...", FlipperHamBulletinIndexAdd, flipperham_bulletin_callback, app);
+
+
+    for(i = 0; i < TXT_N; i++)
+    {
+        if(!app->bulletin_used[i]) continue;
+        if(!app->bulletin[i][0]) continue;
+
+        submenu_add_item( app->bulletin_menu, app->bulletin[i], FlipperHamBulletinIndexBase + i, flipperham_bulletin_callback, app);
+    }
+}
+
 static void flipperham_send_callback(void* context, uint32_t index)
 {
     FlipperHamApp* app = context;
 
     if(index == FlipperHamSendIndexBulletin)
-    {
-        app->send_requested = true;
-        view_dispatcher_stop(app->view_dispatcher);
-    }
+        view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewBulletin);
+}
+
+static void flipperham_bulletin_callback(void* context, uint32_t index)
+{
+    UNUSED(context);
+
+    UNUSED(index);
 }
 
 static void flipperham_draw_callback(Canvas* canvas, void* context) 
@@ -631,6 +670,7 @@ static FlipperHamApp* flipperham_app_alloc(void) {
     app->view_dispatcher = view_dispatcher_alloc();
     app->submenu = submenu_alloc();
     app->send_menu = submenu_alloc();
+    app->bulletin_menu = submenu_alloc();
 
         app->view_port = NULL;
         app->tx_started = false;
@@ -648,16 +688,23 @@ static FlipperHamApp* flipperham_app_alloc(void) {
 
     submenu_add_item( app->submenu, "Send", FlipperHamMenuIndexSend, flipperham_menu_callback, app);
 
+
     submenu_add_item( app->send_menu, "Message", FlipperHamSendIndexMessage, flipperham_send_callback, app);
     submenu_add_item( app->send_menu, "Status", FlipperHamSendIndexStatus, flipperham_send_callback, app);
     submenu_add_item( app->send_menu, "Bulletin", FlipperHamSendIndexBulletin, flipperham_send_callback, app);
     submenu_add_item( app->send_menu, "Settings", FlipperHamSendIndexSettings, flipperham_send_callback, app);
 
+
+    flipperham_bulletin_menu_reload(app);
+
     view_set_previous_callback(submenu_get_view(app->submenu), flipperham_exit_callback);
     view_set_previous_callback(submenu_get_view(app->send_menu), flipperham_send_exit_callback);
+    view_set_previous_callback(submenu_get_view(app->bulletin_menu), flipperham_bulletin_exit_callback);
+
 
     view_dispatcher_add_view( app->view_dispatcher, FlipperHamViewMenu, submenu_get_view(app->submenu));
     view_dispatcher_add_view( app->view_dispatcher, FlipperHamViewSend, submenu_get_view(app->send_menu));
+    view_dispatcher_add_view( app->view_dispatcher, FlipperHamViewBulletin, submenu_get_view(app->bulletin_menu));
     view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewMenu);
 
     flipperham_load_first_segment(app);
@@ -670,6 +717,7 @@ static void flipperham_menu_free(FlipperHamApp* app)
     if(app->view_dispatcher) {
         view_dispatcher_remove_view(app->view_dispatcher, FlipperHamViewMenu);
         view_dispatcher_remove_view(app->view_dispatcher, FlipperHamViewSend);
+        view_dispatcher_remove_view(app->view_dispatcher, FlipperHamViewBulletin);
         view_dispatcher_free(app->view_dispatcher);
         app->view_dispatcher = NULL;
     }
@@ -684,6 +732,12 @@ static void flipperham_menu_free(FlipperHamApp* app)
     {
         submenu_free(app->send_menu);
         app->send_menu = NULL;
+    }
+
+    if(app->bulletin_menu) 
+    {
+        submenu_free(app->bulletin_menu);
+        app->bulletin_menu = NULL;
     }
 }
 
