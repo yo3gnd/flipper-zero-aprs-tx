@@ -9,6 +9,7 @@
 #include <cc1101_regs.h>
 #include <furi_hal_subghz_configs.h>
 #include <lib/toolbox/level_duration.h>
+#include <storage/storage.h>
 
 #include <stdio.h>
 #include <string.h>
@@ -20,6 +21,8 @@
 #define CALL_N        32
 #define TXT_LEN       68
 #define CALL_LEN      10
+#define CFG_DIR       "/ext/apps_data/aprstx"
+#define CFG_FILE      "/ext/apps_data/aprstx/cfg.bin"
 
 typedef struct {
     const char* name;
@@ -64,6 +67,26 @@ typedef struct {
     uint16_t bit_left_us;
     uint16_t part[4];
 } FlipperHamRuntimeTx;
+
+typedef struct
+{
+    uint8_t encoding_index;
+
+    char bulletin[TXT_N][TXT_LEN];
+    char status[TXT_N][TXT_LEN];
+    char message[TXT_N][TXT_LEN];
+    char calls[CALL_N][CALL_LEN];
+
+    uint8_t bulletin_used[TXT_N];
+    uint8_t status_used[TXT_N];
+    uint8_t message_used[TXT_N];
+    uint8_t calls_used[CALL_N];
+
+    uint8_t bulletin_n;
+    uint8_t status_n;
+    uint8_t message_n;
+    uint8_t calls_n;
+} FlipperHamCfg;
 
 void packet_do_all(Packet* p, const char* from, uint8_t from_ssid, const char* to, uint8_t to_ssid, const char* s);
 
@@ -180,6 +203,147 @@ static uint32_t flipperham_exit_callback(void* context)
 {
     UNUSED(context);
     return VIEW_NONE;
+}
+
+static void cfgdefs(FlipperHamApp* app)
+{
+    memset(app->bulletin, 0, sizeof(app->bulletin));
+    memset(app->status, 0, sizeof(app->status));
+    memset(app->message, 0, sizeof(app->message));
+    memset(app->calls, 0, sizeof(app->calls));
+
+    memset(app->bulletin_used, 0, sizeof(app->bulletin_used));
+    memset(app->status_used, 0, sizeof(app->status_used));
+    memset(app->message_used, 0, sizeof(app->message_used));
+    memset(app->calls_used, 0, sizeof(app->calls_used));
+
+    app->bulletin_n = 0;
+    app->status_n = 0;
+
+    app->message_n = 0;
+    app->calls_n = 0;
+
+    app->encoding_index = FlipperHamModemProfileDefault;
+
+
+    snprintf(app->bulletin[0], sizeof(app->bulletin[0]), "flipper bulletin");
+    snprintf(app->status[0], sizeof(app->status[0]), "flipper status");
+
+        snprintf(app->message[0], sizeof(app->message[0]), "Hello from Flipper Zero! :D");
+
+        app->bulletin_used[0] = 1;
+        app->status_used[0] = 1;
+        app->message_used[0] = 1;
+
+        app->bulletin_n = 1;
+        app->status_n = 1;
+        app->message_n = 1;
+}
+
+static void cfgsave(FlipperHamApp* app)
+{
+    Storage* storage;
+    File* file;
+    FlipperHamCfg* c;
+
+    c = malloc(sizeof(FlipperHamCfg));
+    if(!c) return;
+
+    c->encoding_index = app->encoding_index;
+
+    memcpy(c->bulletin, app->bulletin, sizeof(c->bulletin));
+    memcpy(c->status, app->status, sizeof(c->status));
+
+
+    memcpy(c->message, app->message, sizeof(c->message));
+    memcpy(c->calls, app->calls, sizeof(c->calls));
+
+
+    memcpy(c->bulletin_used, app->bulletin_used, sizeof(c->bulletin_used));
+    memcpy(c->status_used, app->status_used, sizeof(c->status_used));
+    memcpy(c->message_used, app->message_used, sizeof(c->message_used));
+    memcpy(c->calls_used, app->calls_used, sizeof(c->calls_used));
+
+    c->bulletin_n = app->bulletin_n;
+    c->status_n = app->status_n;
+
+    c->message_n = app->message_n;
+    c->calls_n = app->calls_n;
+
+    storage = furi_record_open(RECORD_STORAGE);
+    file = storage_file_alloc(storage);
+
+    storage_common_mkdir(storage, "/ext/apps_data");
+    storage_common_mkdir(storage, CFG_DIR);
+
+    if(storage_file_open(file, CFG_FILE, FSAM_WRITE, FSOM_CREATE_ALWAYS)) storage_file_write(file, c, sizeof(FlipperHamCfg));
+
+    storage_file_close(file);
+    storage_file_free(file);
+    furi_record_close(RECORD_STORAGE);
+
+    free(c);
+}
+
+static void cfgload(FlipperHamApp* app)
+{
+    Storage* storage;
+    File* file;
+    FlipperHamCfg* c;
+    uint16_t n;
+
+    c = malloc(sizeof(FlipperHamCfg));
+    if(!c) {
+        cfgdefs(app);
+        return;
+    }
+
+    storage = furi_record_open(RECORD_STORAGE);
+    file = storage_file_alloc(storage);
+
+    storage_common_mkdir(storage, "/ext/apps_data");
+    storage_common_mkdir(storage, CFG_DIR);
+
+    if(!storage_file_open(file, CFG_FILE, FSAM_READ, FSOM_OPEN_EXISTING)) {
+        storage_file_free(file);
+        furi_record_close(RECORD_STORAGE);
+        free(c);
+        cfgdefs(app);
+        cfgsave(app);
+        return;
+    }
+
+    n = storage_file_read(file, c, sizeof(FlipperHamCfg));
+    storage_file_close(file);
+    storage_file_free(file);
+    furi_record_close(RECORD_STORAGE);
+
+    if(n != sizeof(FlipperHamCfg)) {
+        free(c);
+        cfgdefs(app);
+        cfgsave(app);
+        return;
+    }
+
+    app->encoding_index = c->encoding_index;
+
+    memcpy(app->bulletin, c->bulletin, sizeof(app->bulletin));
+    memcpy(app->status, c->status, sizeof(app->status));
+    memcpy(app->message, c->message, sizeof(app->message));
+    memcpy(app->calls, c->calls, sizeof(app->calls));
+
+    memcpy(app->bulletin_used, c->bulletin_used, sizeof(app->bulletin_used));
+    memcpy(app->status_used, c->status_used, sizeof(app->status_used));
+    memcpy(app->message_used, c->message_used, sizeof(app->message_used));
+    memcpy(app->calls_used, c->calls_used, sizeof(app->calls_used));
+
+    app->bulletin_n = c->bulletin_n;
+    app->status_n = c->status_n;
+
+    app->message_n = c->message_n;
+    app->calls_n = c->calls_n;
+
+    free(c);
 }
 
 static void flipperham_encoding_change(VariableItem* item)
@@ -469,34 +633,7 @@ static FlipperHamApp* flipperham_app_alloc(void) {
         app->pkt = malloc(sizeof(Packet));
         app->wave = malloc(sizeof(uint16_t) * 4096);
 
-        memset(app->bulletin, 0, sizeof(app->bulletin));
-        memset(app->status, 0, sizeof(app->status));
-        memset(app->message, 0, sizeof(app->message));
-        memset(app->calls, 0, sizeof(app->calls));
-
-        memset(app->bulletin_used, 0, sizeof(app->bulletin_used));
-        memset(app->status_used, 0, sizeof(app->status_used));
-        memset(app->message_used, 0, sizeof(app->message_used));
-        memset(app->calls_used, 0, sizeof(app->calls_used));
-
-        app->bulletin_n = 0;
-        app->status_n = 0;
-
-        app->message_n = 0;
-        app->calls_n = 0;
-
-    snprintf(app->bulletin[0], sizeof(app->bulletin[0]), "flipper bulletin");
-    snprintf(app->status[0], sizeof(app->status[0]), "flipper status");
-
-        snprintf(app->message[0], sizeof(app->message[0]), "Hello from Flipper Zero! :D");
-
-        app->bulletin_used[0] = 1;
-        app->status_used[0] = 1;
-        app->message_used[0] = 1;
-
-        app->bulletin_n = 1;
-        app->status_n = 1;
-        app->message_n = 1;
+        cfgload(app);
 
     view_dispatcher_enable_queue( app->view_dispatcher);
     view_dispatcher_attach_to_gui(app->view_dispatcher, app->gui, ViewDispatcherTypeFullscreen);
