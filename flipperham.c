@@ -11,10 +11,15 @@
 #include <lib/toolbox/level_duration.h>
 
 #include <stdio.h>
+#include <string.h>
 
 #define CARRIER_HZ    433250000UL
 #define MY_CALL       "FL1PER"
 #define MY_TOCALL     "APZFLP"
+#define TXT_N         16
+#define CALL_N        32
+#define TXT_LEN       68
+#define CALL_LEN      10
 
 typedef struct {
     const char* name;
@@ -123,6 +128,18 @@ typedef struct
     uint16_t wave_n;
     int16_t wave_c;
     bool wave_mark;
+    char bulletin[TXT_N][TXT_LEN];
+    char status[TXT_N][TXT_LEN];
+    char message[TXT_N][TXT_LEN];
+    char calls[CALL_N][CALL_LEN];
+    uint8_t bulletin_used[TXT_N];
+    uint8_t status_used[TXT_N];
+    uint8_t message_used[TXT_N];
+    uint8_t calls_used[CALL_N];
+    uint8_t bulletin_n;
+    uint8_t status_n;
+    uint8_t message_n;
+    uint8_t calls_n;
     FlipperHamRuntimeTx tx;
 } FlipperHamApp;
 
@@ -451,6 +468,35 @@ static FlipperHamApp* flipperham_app_alloc(void) {
         app->encoding_index = FlipperHamModemProfileDefault;
         app->pkt = malloc(sizeof(Packet));
         app->wave = malloc(sizeof(uint16_t) * 4096);
+
+        memset(app->bulletin, 0, sizeof(app->bulletin));
+        memset(app->status, 0, sizeof(app->status));
+        memset(app->message, 0, sizeof(app->message));
+        memset(app->calls, 0, sizeof(app->calls));
+
+        memset(app->bulletin_used, 0, sizeof(app->bulletin_used));
+        memset(app->status_used, 0, sizeof(app->status_used));
+        memset(app->message_used, 0, sizeof(app->message_used));
+        memset(app->calls_used, 0, sizeof(app->calls_used));
+
+        app->bulletin_n = 0;
+        app->status_n = 0;
+
+        app->message_n = 0;
+        app->calls_n = 0;
+
+    snprintf(app->bulletin[0], sizeof(app->bulletin[0]), "flipper bulletin");
+    snprintf(app->status[0], sizeof(app->status[0]), "flipper status");
+
+        snprintf(app->message[0], sizeof(app->message[0]), "Hello from Flipper Zero! :D");
+
+        app->bulletin_used[0] = 1;
+        app->status_used[0] = 1;
+        app->message_used[0] = 1;
+
+        app->bulletin_n = 1;
+        app->status_n = 1;
+        app->message_n = 1;
 
     view_dispatcher_enable_queue( app->view_dispatcher);
     view_dispatcher_attach_to_gui(app->view_dispatcher, app->gui, ViewDispatcherTypeFullscreen);
