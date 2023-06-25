@@ -94,6 +94,11 @@ typedef struct
 } FlipperHamCfg;
 
 void packet_do_all(Packet* p, const char* from, uint8_t from_ssid, const char* to, uint8_t to_ssid, const char* s);
+void packet_init(Packet* p);
+void packet_make_ax25(Packet* p, const char* from, uint8_t from_ssid, const char* to, uint8_t to_ssid);
+void packet_add_fcs(Packet* p);
+void packet_stuff(Packet* p);
+void packet_nrzi(Packet* p);
 
 enum {
     FlipperHamPresetDefault = 0,
@@ -179,7 +184,7 @@ typedef struct
     uint8_t b_i;
     uint8_t st_i;
     uint8_t m_i;
-    uint8_t d_i;
+      uint8_t d_i;  // dest
     uint8_t c_i;
     uint8_t txt;
     char b_edit[TXT_LEN];
@@ -628,19 +633,20 @@ static void mx(void* context, InputType input_type, uint32_t index)
     {
         app->tx_t = 2;
         app->s_i = i;
+
         view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewCall);
         return;
     }
 
     if(input_type != InputTypeLong) return;
 
-    app->m_i = i;
-    snprintf(app->m_edit, sizeof(app->m_edit), "%s", app->message[i]);
-    app->txt = 3;
+    app->m_i = i; snprintf(app->m_edit, sizeof(app->m_edit), "%s", app->message[i]); app->txt = 3;
 
     text_input_reset(app->text_input);
     text_input_set_header_text(app->text_input, "Message");
     text_input_set_result_callback(app->text_input, msave, app, app->m_edit, sizeof(app->m_edit), true);
+
+
 
     view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewTextInput);
 }
@@ -903,15 +909,17 @@ static void cx(void* context, InputType input_type, uint32_t index)
         if(app->tx_t == 2)
         {
             app->d_i = i;
-            view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewSend);
+            app->send_requested = true;
+            view_dispatcher_stop(app->view_dispatcher);
+
+
             return;
         }
     }
 
     if(input_type != InputTypeLong) return;
 
-    app->c_i = i;
-    snprintf(app->c_edit, sizeof(app->c_edit), "%s", app->calls[i]);
+    app->c_i = i; snprintf(app->c_edit, sizeof(app->c_edit), "%s", app->calls[i]);
     app->txt = 2;
 
     text_input_reset(app->text_input);
@@ -1136,7 +1144,8 @@ static void txstart(FlipperHamApp* app)
     if(!app->wave) return;
     if(app->s_i >= TXT_N) return;
 
-    if(!app->tx_t)
+    /* bulleting message */
+    if(app->tx_t == 0)
     {
         if(!app->bulletin_used[app->s_i]) return;
         if(!app->bulletin[app->s_i][0]) return;
@@ -1147,15 +1156,33 @@ static void txstart(FlipperHamApp* app)
 
         snprintf(a, sizeof(a), ":BLN%c     :%s", b, app->bulletin[app->s_i]);
     }
-    else
+    /* status message */
+    else if(app->tx_t == 1)
     {
         if(!app->status_used[app->s_i]) return;
         if(!app->status[app->s_i][0]) return;
 
         snprintf(a, sizeof(a), ">%s", app->status[app->s_i]);
     }
+    /* type: aprs direct */
+    else
+    {
+        if(app->d_i >= CALL_N) return;
+        if(!app->message_used[app->s_i]) return;
+        if(!app->message[app->s_i][0]) return;
+        if(!app->calls_used[app->d_i]) return;
+        if(!app->calls[app->d_i][0]) return;
 
-    packet_do_all(app->pkt, MY_CALL, 0, MY_TOCALL, 0, a);
+        snprintf(a, sizeof(a), ":%-9s:%s", app->calls[app->d_i], app->message[app->s_i]);
+    }
+
+    packet_init(app->pkt);
+    snprintf((char*)app->pkt->payload, sizeof(app->pkt->payload), "%s", a);
+    app->pkt->payload_len = strlen((char*)app->pkt->payload);
+    packet_make_ax25(app->pkt, MY_CALL, 0, MY_TOCALL, 0);
+    packet_add_fcs(app->pkt);
+    packet_stuff(app->pkt);
+    packet_nrzi(app->pkt);
 
     // 50ms mark
     for(i = 0; i < 60 && put(app, 1); i++);
