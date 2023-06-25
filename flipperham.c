@@ -142,6 +142,7 @@ typedef struct
     Submenu* send_menu;
     Submenu* bulletin_menu;
     Submenu* status_menu;
+    Submenu* call_menu;
     TextInput* text_input;
     ViewPort* view_port;
     volatile uint16_t current_tone_hz;
@@ -174,9 +175,11 @@ typedef struct
     uint8_t tx_t;
     uint8_t b_i;
     uint8_t st_i;
+    uint8_t c_i;
     uint8_t txt;
     char b_edit[TXT_LEN];
     char st_edit[TXT_LEN];
+    char c_edit[CALL_LEN];
     FlipperHamRuntimeTx tx;
 } FlipperHamApp;
 
@@ -186,6 +189,7 @@ enum
     FlipperHamViewSend,
     FlipperHamViewBulletin,
     FlipperHamViewStatus,
+    FlipperHamViewCall,
     FlipperHamViewTextInput,
 };
 
@@ -212,6 +216,12 @@ enum
 {
     FlipperHamStatusIndexAdd = 0,
     FlipperHamStatusIndexBase = 200,
+};
+
+enum
+{
+    FlipperHamCallIndexAdd = 0,
+    FlipperHamCallIndexBase = 300,
 };
 
 static const FlipperHamPreset flipperham_presets[] = 
@@ -257,17 +267,27 @@ static uint32_t flipperham_status_exit_callback(void* context)
     return FlipperHamViewSend;
 }
 
+static uint32_t flipperham_call_exit_callback(void* context) 
+{
+    UNUSED(context);
+
+    return FlipperHamViewSend;
+}
+
 static void flipperham_bulletin_callback(void* context, uint32_t index);
 static void bx(void* context, InputType input_type, uint32_t index);
 static void st(void* context, uint32_t index);
 static void sx(void* context, InputType input_type, uint32_t index);
+static void cl(void* context, uint32_t index);
 static void bsave(void* context);
 static void stsave(void* context);
+static void csave(void* context);
 
 static uint32_t flipperham_text_exit_callback(void* context) 
 {
     FlipperHamApp* app = context;
 
+    if(app->txt == 2) return FlipperHamViewCall;
     if(app->txt) return FlipperHamViewStatus;
     return FlipperHamViewBulletin;
 }
@@ -295,16 +315,21 @@ static void cfgdefs(FlipperHamApp* app)
 
     snprintf(app->bulletin[0], sizeof(app->bulletin[0]), "flipper bulletin");
     snprintf(app->status[0], sizeof(app->status[0]), "flipper status");
+    snprintf(app->calls[0], sizeof(app->calls[0]), "FL1PER");
+    snprintf(app->calls[1], sizeof(app->calls[1]), "YO3GND-12");
 
         snprintf(app->message[0], sizeof(app->message[0]), "Hello from Flipper Zero! :D");
 
         app->bulletin_used[0] = 1;
         app->status_used[0] = 1;
         app->message_used[0] = 1;
+        app->calls_used[0] = 1;
+        app->calls_used[1] = 1;
 
         app->bulletin_n = 1;
         app->status_n = 1;
         app->message_n = 1;
+        app->calls_n = 2;
 }
 
 static void cfgsave(FlipperHamApp* app)
@@ -475,9 +500,38 @@ static void stfix(FlipperHamApp* app)
         if(app->status_used[i] && app->status[i][0]) app->status_n++;
 }
 
+static void cmenu(FlipperHamApp* app)
+{
+    uint8_t i;
+
+    submenu_reset(app->call_menu);
+    submenu_add_item( app->call_menu, "Add new callsign...", FlipperHamCallIndexAdd, cl, app);
+
+    for(i = 0; i < CALL_N; i++)
+    {
+        if(!app->calls_used[i]) continue;
+        if(!app->calls[i][0]) continue;
+
+        submenu_add_item( app->call_menu, app->calls[i], FlipperHamCallIndexBase + i, cl, app);
+    }
+}
+
+static void cfix(FlipperHamApp* app)
+{
+    uint8_t i;
+
+    app->calls_n = 0;
+
+    for(i = 0; i < CALL_N; i++)
+        if(app->calls_used[i] && app->calls[i][0]) app->calls_n++;
+}
+
 static void flipperham_send_callback(void* context, uint32_t index)
 {
     FlipperHamApp* app = context;
+
+    if(index == FlipperHamSendIndexMessage)
+        view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewCall);
 
     if(index == FlipperHamSendIndexBulletin)
         view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewBulletin);
@@ -652,6 +706,69 @@ static void stsave(void* context)
     stmenu(app);
 
     view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewStatus);
+}
+
+static void cl(void* context, uint32_t index)
+{
+    FlipperHamApp* app = context;
+    uint8_t i;
+
+    if(index == FlipperHamCallIndexAdd)
+    {
+        app->c_i = 0xff;
+
+        for(i = 0; i < CALL_N; i++)
+            if(!app->calls_used[i]) {
+                app->c_i = i;
+                break;
+            }
+
+        if(app->c_i == 0xff) return;
+
+        app->c_edit[0] = 0;
+    }
+    else
+    {
+        i = index - FlipperHamCallIndexBase;
+        if(i >= CALL_N) return;
+
+        app->c_i = i;
+        snprintf(app->c_edit, sizeof(app->c_edit), "%s", app->calls[i]);
+    }
+
+    app->txt = 2;
+
+    text_input_reset(app->text_input);
+    text_input_set_header_text(app->text_input, "Callsign");
+    text_input_set_result_callback(app->text_input, csave, app, app->c_edit, sizeof(app->c_edit), true);
+
+    view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewTextInput);
+}
+
+static void csave(void* context)
+{
+    FlipperHamApp* app = context;
+    uint8_t i;
+
+    i = app->c_i;
+    if(i >= CALL_N) return;
+
+    if(!app->c_edit[0])
+    {
+        app->calls[i][0] = 0;
+        app->calls_used[i] = 0;
+    }
+    else
+    {
+        snprintf(app->calls[i], sizeof(app->calls[i]), "%s", app->c_edit);
+        app->calls_used[i] = 1;
+    }
+
+    cfix(app);
+    cfgsave(app);
+    cmenu(app);
+
+    view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewCall);
 }
 
 static void flipperham_draw_callback(Canvas* canvas, void* context) 
@@ -887,6 +1004,7 @@ static FlipperHamApp* flipperham_app_alloc(void) {
     app->send_menu = submenu_alloc();
     app->bulletin_menu = submenu_alloc();
     app->status_menu = submenu_alloc();
+    app->call_menu = submenu_alloc();
     app->text_input = text_input_alloc();
 
         app->view_port = NULL;
@@ -898,6 +1016,7 @@ static FlipperHamApp* flipperham_app_alloc(void) {
         app->s_i = 0;
         app->tx_t = 0;
         app->st_i = 0;
+        app->c_i = 0;
         app->txt = 0;
         app->pkt = malloc(sizeof(Packet));
         app->wave = malloc(sizeof(uint16_t) * 4096);
@@ -918,12 +1037,14 @@ static FlipperHamApp* flipperham_app_alloc(void) {
 
     bmenu(app);
     stmenu(app);
+    cmenu(app);
 
 
     view_set_previous_callback(submenu_get_view(app->submenu), flipperham_exit_callback);
     view_set_previous_callback(submenu_get_view(app->send_menu), flipperham_send_exit_callback);
     view_set_previous_callback(submenu_get_view(app->bulletin_menu), flipperham_bulletin_exit_callback);
     view_set_previous_callback(submenu_get_view(app->status_menu), flipperham_status_exit_callback);
+    view_set_previous_callback(submenu_get_view(app->call_menu), flipperham_call_exit_callback);
     view_set_previous_callback(text_input_get_view(app->text_input), flipperham_text_exit_callback);
 
 
@@ -931,6 +1052,7 @@ static FlipperHamApp* flipperham_app_alloc(void) {
     view_dispatcher_add_view( app->view_dispatcher, FlipperHamViewSend, submenu_get_view(app->send_menu));
     view_dispatcher_add_view( app->view_dispatcher, FlipperHamViewBulletin, submenu_get_view(app->bulletin_menu));
     view_dispatcher_add_view( app->view_dispatcher, FlipperHamViewStatus, submenu_get_view(app->status_menu));
+    view_dispatcher_add_view( app->view_dispatcher, FlipperHamViewCall, submenu_get_view(app->call_menu));
     view_dispatcher_add_view( app->view_dispatcher, FlipperHamViewTextInput, text_input_get_view(app->text_input));
     view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewMenu);
 
@@ -946,6 +1068,7 @@ static void flipperham_menu_free(FlipperHamApp* app)
         view_dispatcher_remove_view(app->view_dispatcher, FlipperHamViewSend);
         view_dispatcher_remove_view(app->view_dispatcher, FlipperHamViewBulletin);
         view_dispatcher_remove_view(app->view_dispatcher, FlipperHamViewStatus);
+        view_dispatcher_remove_view(app->view_dispatcher, FlipperHamViewCall);
         view_dispatcher_remove_view(app->view_dispatcher, FlipperHamViewTextInput);
         view_dispatcher_free(app->view_dispatcher);
         app->view_dispatcher = NULL;
@@ -973,6 +1096,12 @@ static void flipperham_menu_free(FlipperHamApp* app)
     {
         submenu_free(app->status_menu);
         app->status_menu = NULL;
+    }
+
+    if(app->call_menu) 
+    {
+        submenu_free(app->call_menu);
+        app->call_menu = NULL;
     }
 
     if(app->text_input)
