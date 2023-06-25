@@ -2,6 +2,8 @@
 
 static void bx0(void* context, uint32_t index);
 static void sx0(void* context, uint32_t index);
+static void cx0(void* context, uint32_t index);
+static void mx0(void* context, uint32_t index);
 #include <furi_hal.h>
 #include <gui/gui.h>
 #include <gui/modules/submenu.h>
@@ -177,6 +179,7 @@ typedef struct
     uint8_t b_i;
     uint8_t st_i;
     uint8_t m_i;
+    uint8_t d_i;
     uint8_t c_i;
     uint8_t txt;
     char b_edit[TXT_LEN];
@@ -286,8 +289,9 @@ static uint32_t flipperham_message_exit_callback(void* context)
 
 static uint32_t flipperham_call_exit_callback(void* context) 
 {
-    UNUSED(context);
+    FlipperHamApp* app = context;
 
+    if(app->tx_t == 2) return FlipperHamViewMessage;
     return FlipperHamViewSend;
 }
 
@@ -295,7 +299,9 @@ static void flipperham_bulletin_callback(void* context, uint32_t index);
 static void bx(void* context, InputType input_type, uint32_t index);
 static void st(void* context, uint32_t index);
 static void sx(void* context, InputType input_type, uint32_t index);
+static void mx(void* context, InputType input_type, uint32_t index);
 static void m(void* context, uint32_t index);
+static void cx(void* context, InputType input_type, uint32_t index);
 static void cl(void* context, uint32_t index);
 static void bsave(void* context);
 static void stsave(void* context);
@@ -533,7 +539,7 @@ static void cmenu(FlipperHamApp* app)
         if(!app->calls_used[i]) continue;
         if(!app->calls[i][0]) continue;
 
-        submenu_add_item( app->call_menu, app->calls[i], FlipperHamCallIndexBase + i, cl, app);
+        submenu_add_item(app->call_menu, app->calls[i], FlipperHamCallIndexBase + i, cx0, app);
     }
 }
 
@@ -559,7 +565,7 @@ static void mmenu(FlipperHamApp* app)
         if(!app->message_used[i]) continue;
         if(!app->message[i][0]) continue;
 
-        submenu_add_item( app->message_menu, app->message[i], FlipperHamMessageIndexBase + i, m, app);
+        submenu_add_item(app->message_menu, app->message[i], FlipperHamMessageIndexBase + i, mx0, app);
     }
 }
 
@@ -601,6 +607,35 @@ static void m(void* context, uint32_t index)
         snprintf(app->m_edit, sizeof(app->m_edit), "%s", app->message[i]);
     }
 
+    app->txt = 3;
+
+    text_input_reset(app->text_input);
+    text_input_set_header_text(app->text_input, "Message");
+    text_input_set_result_callback(app->text_input, msave, app, app->m_edit, sizeof(app->m_edit), true);
+
+    view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewTextInput);
+}
+
+static void mx(void* context, InputType input_type, uint32_t index)
+{
+    FlipperHamApp* app = context;
+    uint8_t i;
+
+    i = index - FlipperHamMessageIndexBase;
+    if(i >= TXT_N) return;
+
+    if(input_type == InputTypeShort)
+    {
+        app->tx_t = 2;
+        app->s_i = i;
+        view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewCall);
+        return;
+    }
+
+    if(input_type != InputTypeLong) return;
+
+    app->m_i = i;
+    snprintf(app->m_edit, sizeof(app->m_edit), "%s", app->message[i]);
     app->txt = 3;
 
     text_input_reset(app->text_input);
@@ -846,6 +881,37 @@ static void cl(void* context, uint32_t index)
         snprintf(app->c_edit, sizeof(app->c_edit), "%s", app->calls[i]);
     }
 
+    app->txt = 2;
+
+    text_input_reset(app->text_input);
+    text_input_set_header_text(app->text_input, "Callsign");
+    text_input_set_result_callback(app->text_input, csave, app, app->c_edit, sizeof(app->c_edit), true);
+
+    view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewTextInput);
+}
+
+static void cx(void* context, InputType input_type, uint32_t index)
+{
+    FlipperHamApp* app = context;
+    uint8_t i;
+
+    i = index - FlipperHamCallIndexBase;
+    if(i >= CALL_N) return;
+
+    if(input_type == InputTypeShort)
+    {
+        if(app->tx_t == 2)
+        {
+            app->d_i = i;
+            view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewSend);
+            return;
+        }
+    }
+
+    if(input_type != InputTypeLong) return;
+
+    app->c_i = i;
+    snprintf(app->c_edit, sizeof(app->c_edit), "%s", app->calls[i]);
     app->txt = 2;
 
     text_input_reset(app->text_input);
@@ -1194,6 +1260,7 @@ static FlipperHamApp* flipperham_app_alloc(void) {
         app->tx_t = 0;
         app->st_i = 0;
         app->m_i = 0;
+        app->d_i = 0;
         app->c_i = 0;
         app->txt = 0;
         app->pkt = malloc(sizeof(Packet));
@@ -1365,6 +1432,8 @@ flipperham_status_view_free(app);
 
 static void bx0(void* context, uint32_t index) { bx(context, InputTypeShort, index); }
 static void sx0(void* context, uint32_t index) { sx(context, InputTypeShort, index); }
+static void cx0(void* context, uint32_t index) { cx(context, InputTypeShort, index); }
+static void mx0(void* context, uint32_t index) { mx(context, InputTypeShort, index); }
 
 
 int32_t flipperham_app(void* p)
