@@ -167,6 +167,7 @@ typedef struct
     uint16_t wave_n;
     int16_t wave_c;
     bool wave_mark;
+    uint8_t go_v;
     char bulletin[TXT_N][TXT_LEN];
     char status[TXT_N][TXT_LEN];
     char message[TXT_N][TXT_LEN];
@@ -731,6 +732,7 @@ static void bx(void* context, InputType input_type, uint32_t index)
     {
         app->tx_t = 0;
         app->s_i = i;
+        app->go_v = FlipperHamViewBulletin;
         app->send_requested = true;
         view_dispatcher_stop(app->view_dispatcher);
         return;
@@ -815,6 +817,7 @@ static void sx(void* context, InputType input_type, uint32_t index)
     {
         app->tx_t = 1;
         app->s_i = i;
+        app->go_v = FlipperHamViewStatus;
         app->send_requested = true;
         view_dispatcher_stop(app->view_dispatcher);
         return;
@@ -909,6 +912,7 @@ static void cx(void* context, InputType input_type, uint32_t index)
         if(app->tx_t == 2)
         {
             app->d_i = i;
+            app->go_v = FlipperHamViewMessage;
             app->send_requested = true;
             view_dispatcher_stop(app->view_dispatcher);
 
@@ -1289,6 +1293,7 @@ static FlipperHamApp* flipperham_app_alloc(void) {
         app->m_i = 0;
         app->d_i = 0;
         app->c_i = 0;
+        app->go_v = FlipperHamViewMenu;
         app->txt = 0;
         app->pkt = malloc(sizeof(Packet));
         app->wave = malloc(sizeof(uint16_t) * 4096);
@@ -1472,7 +1477,7 @@ int32_t flipperham_app(void* p)
     while(1) 
     {
         app->send_requested = false;
-        view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewMenu);
+        view_dispatcher_switch_to_view(app->view_dispatcher, app->go_v);
         view_dispatcher_run(app->view_dispatcher);
 
 
