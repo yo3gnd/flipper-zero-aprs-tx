@@ -956,3 +956,4 @@ int32_t flipperham_app(void* p)
 
     flipperham_app_free(app);
     return 0;
+}
