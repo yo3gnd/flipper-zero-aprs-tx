@@ -475,8 +475,7 @@ static void flipperham_menu_callback(void* context, uint32_t index)
 {
     FlipperHamApp* app = context;
 
-    if(index == FlipperHamMenuIndexSend) 
-        view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewSend);
+    if(index == FlipperHamMenuIndexSend) view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewSend);
 
 }
 
@@ -556,7 +555,12 @@ static void cfix(FlipperHamApp* app)
     app->calls_n = 0;
 
     for(i = 0; i < CALL_N; i++)
-        if(app->calls_used[i] && app->calls[i][0]) app->calls_n++;
+    {
+        if(app->calls[i][0]) app->calls_used[i] = 1;
+        else app->calls_used[i] = 0;
+
+        if(app->calls_used[i]) app->calls_n++;
+    }
 }
 
 static void mmenu(FlipperHamApp* app)
@@ -582,7 +586,12 @@ static void mfix(FlipperHamApp* app)
     app->message_n = 0;
 
     for(i = 0; i < TXT_N; i++)
-        if(app->message_used[i] && app->message[i][0]) app->message_n++;
+    {
+        if(app->message[i][0]) app->message_used[i] = 1;
+        else app->message_used[i] = 0;
+
+        if(app->message_used[i]) app->message_n++;
+    }
 }
 
 static void m(void* context, uint32_t index)
@@ -595,7 +604,7 @@ static void m(void* context, uint32_t index)
         app->m_i = 0xff;
 
         for(i = 0; i < TXT_N; i++)
-            if(!app->message_used[i]) {
+            if(!app->message_used[i] || !app->message[i][0]) {
                 app->m_i = i;
                 break;
             }
@@ -872,7 +881,7 @@ static void cl(void* context, uint32_t index)
         app->c_i = 0xff;
 
         for(i = 0; i < CALL_N; i++)
-            if(!app->calls_used[i]) {
+            if(!app->calls_used[i] || !app->calls[i][0]) {
                 app->c_i = i;
                 break;
             }
@@ -1264,7 +1273,9 @@ static void flipperham_radio_start(FlipperHamApp* app)
 
 static void flipperham_radio_stop(FlipperHamApp* app) 
 {
-    if(app->tx_started) furi_hal_subghz_stop_async_tx();
+    if(app->tx_started) 
+        furi_hal_subghz_stop_async_tx();
+
     furi_hal_subghz_sleep();
 }
 
