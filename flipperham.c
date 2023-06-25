@@ -314,6 +314,10 @@ static void stsave(void* context);
 static void msave(void* context);
 static void csave(void* context);
 static bool cval(char* s);
+static void bfix(FlipperHamApp* app);
+static void stfix(FlipperHamApp* app);
+static void mfix(FlipperHamApp* app);
+static void cfix(FlipperHamApp* app);
 
 static uint32_t flipperham_text_exit_callback(void* context) 
 {
@@ -416,6 +420,7 @@ static void cfgload(FlipperHamApp* app)
     File* file;
     FlipperHamCfg* c;
     uint16_t n;
+    uint8_t i;
 
     c = malloc(sizeof(FlipperHamCfg));
     if(!c) {
@@ -468,6 +473,31 @@ static void cfgload(FlipperHamApp* app)
     app->message_n = c->message_n;
     app->calls_n = c->calls_n;
 
+    if(app->encoding_index >= (sizeof(flipperham_modem_profiles) / sizeof(flipperham_modem_profiles[0])))
+        app->encoding_index = FlipperHamModemProfileDefault;
+
+    for(i = 0; i < TXT_N; i++)
+    {
+        app->bulletin[i][TXT_LEN - 1] = 0;
+        app->status[i][TXT_LEN - 1] = 0;
+        app->message[i][TXT_LEN - 1] = 0;
+    }
+
+    for(i = 0; i < CALL_N; i++)
+    {
+        app->calls[i][CALL_LEN - 1] = 0;
+
+        if(!app->calls[i][0]) continue;
+        if(cval(app->calls[i])) continue;
+
+        app->calls[i][0] = 0;
+    }
+
+    bfix(app);
+    stfix(app);
+    mfix(app);
+    cfix(app);
+
     free(c);
 }
 
@@ -503,7 +533,12 @@ static void bfix(FlipperHamApp* app)
     app->bulletin_n = 0;
 
     for(i = 0; i < TXT_N; i++)
-        if(app->bulletin_used[i] && app->bulletin[i][0]) app->bulletin_n++;
+    {
+        if(app->bulletin[i][0]) app->bulletin_used[i] = 1;
+        else app->bulletin_used[i] = 0;
+
+        if(app->bulletin_used[i]) app->bulletin_n++;
+    }
 }
 
 static void stmenu(FlipperHamApp* app)
@@ -529,7 +564,12 @@ static void stfix(FlipperHamApp* app)
     app->status_n = 0;
 
     for(i = 0; i < TXT_N; i++)
-        if(app->status_used[i] && app->status[i][0]) app->status_n++;
+    {
+        if(app->status[i][0]) app->status_used[i] = 1;
+        else app->status_used[i] = 0;
+
+        if(app->status_used[i]) app->status_n++;
+    }
 }
 
 static void cmenu(FlipperHamApp* app)
