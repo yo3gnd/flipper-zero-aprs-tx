@@ -282,6 +282,7 @@ static void cl(void* context, uint32_t index);
 static void bsave(void* context);
 static void stsave(void* context);
 static void csave(void* context);
+static bool cval(char* s);
 
 static uint32_t flipperham_text_exit_callback(void* context) 
 {
@@ -760,6 +761,11 @@ static void csave(void* context)
     }
     else
     {
+        if(!cval(app->c_edit)) {
+            view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewCall);
+            return;
+        }
+
         snprintf(app->calls[i], sizeof(app->calls[i]), "%s", app->c_edit);
         app->calls_used[i] = 1;
     }
@@ -769,6 +775,67 @@ static void csave(void* context)
     cmenu(app);
 
     view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewCall);
+}
+
+static bool cval(char* s)
+{
+    char a[CALL_LEN];
+    uint8_t i;
+    uint8_t j;
+    uint8_t n;
+    uint8_t ssid;
+    bool dash;
+
+    i = 0;
+    j = 0;
+    n = 0;
+    ssid = 0;
+    dash = false;
+
+    while(s[i] && s[i] != '-') {
+        char c = s[i];
+
+        if(c >= 'a' && c <= 'z') c -= 32;
+        if(!((c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9'))) return false;
+        if(j >= 6) return false;
+
+        a[j++] = c;
+        i++;
+    }
+
+    if(!j) return false;
+
+    if(s[i] == '-') {
+        uint8_t d = 0;
+        dash = true;
+        i++;
+
+        while(s[i]) {
+            if(s[i] < '0' || s[i] > '9') return false;
+            ssid = (ssid * 10) + (s[i] - '0');
+            d++;
+            i++;
+        }
+
+        if(!d) return false;
+        if(d > 2) return false;
+        if(ssid > 15) return false;
+    }
+    else
+    {
+        ssid = 0;
+    }
+
+    a[j++] = '-';
+    if(ssid >= 10) a[j++] = '0' + (ssid / 10);
+    a[j++] = '0' + (ssid % 10);
+    a[j] = 0;
+
+    snprintf(s, CALL_LEN, "%s", a);
+
+    UNUSED(n);
+    UNUSED(dash);
+    return true;
 }
 
 static void flipperham_draw_callback(Canvas* canvas, void* context) 
