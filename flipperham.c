@@ -8,6 +8,7 @@ static void mx0(void* context, uint32_t index);
 #include <gui/gui.h>
 #include <gui/modules/submenu.h>
 #include <gui/modules/text_input.h>
+#include <gui/modules/variable_item_list.h>
 #include <gui/view.h>
 #include <gui/view_dispatcher.h>
 #include <gui/view_port.h>
@@ -151,6 +152,7 @@ typedef struct
     Submenu* status_menu;
     Submenu* message_menu;
     Submenu* call_menu;
+    VariableItemList* ssid_menu;
     TextInput* text_input;
     ViewPort* view_port;
     volatile uint16_t current_tone_hz;
@@ -186,6 +188,7 @@ typedef struct
     uint8_t st_i;
     uint8_t m_i;
       uint8_t d_i;  // dest
+    uint8_t d_s;
     uint8_t c_i;
     uint8_t txt;
     char b_edit[TXT_LEN];
@@ -202,6 +205,7 @@ enum
     FlipperHamViewBulletin,
     FlipperHamViewStatus,
     FlipperHamViewMessage,
+    FlipperHamViewSsid,
     FlipperHamViewCall,
     FlipperHamViewTextInput,
 };
@@ -293,6 +297,13 @@ static uint32_t flipperham_message_exit_callback(void* context)
     return FlipperHamViewSend;
 }
 
+static uint32_t flipperham_ssid_exit_callback(void* context) 
+{
+    UNUSED(context);
+
+    return FlipperHamViewCall;
+}
+
 static uint32_t flipperham_call_exit_callback(void* context) 
 {
     FlipperHamApp* app = context;
@@ -314,10 +325,14 @@ static void stsave(void* context);
 static void msave(void* context);
 static void csave(void* context);
 static bool cval(char* s);
+static bool csplit(const char* s, char* out, uint8_t* ssid, bool* has_ssid);
 static void bfix(FlipperHamApp* app);
 static void stfix(FlipperHamApp* app);
 static void mfix(FlipperHamApp* app);
 static void cfix(FlipperHamApp* app);
+static void sc(VariableItem* item);
+static void se(void* context, uint32_t index);
+static void smenu(FlipperHamApp* app);
 
 static uint32_t flipperham_text_exit_callback(void* context) 
 {
@@ -327,6 +342,12 @@ static uint32_t flipperham_text_exit_callback(void* context)
     if(app->txt == 2) return FlipperHamViewCall;
     if(app->txt) return FlipperHamViewStatus;
     return FlipperHamViewBulletin;
+}
+
+static void ssidfix(FlipperHamApp* app)
+{
+    if(app->d_s > 15) app->d_s = 0;
+    smenu(app);
 }
 
 static void cfgdefs(FlipperHamApp* app)
@@ -601,6 +622,43 @@ static void cfix(FlipperHamApp* app)
 
         if(app->calls_used[i]) app->calls_n++;
     }
+}
+
+static void sc(VariableItem* item)
+{
+    FlipperHamApp* app = variable_item_get_context(item);
+    char a[4];
+
+    app->d_s = variable_item_get_current_value_index(item);
+    snprintf(a, sizeof(a), "%u", app->d_s);
+    variable_item_set_current_value_text(item, a);
+}
+
+static void se(void* context, uint32_t index)
+{
+    FlipperHamApp* app = context;
+
+    UNUSED(index);
+
+    app->go_v = FlipperHamViewMessage;
+    app->send_requested = true;
+    view_dispatcher_stop(app->view_dispatcher);
+}
+
+static void smenu(FlipperHamApp* app)
+{
+    VariableItem* it;
+    char a[4];
+
+    variable_item_list_reset(app->ssid_menu);
+
+    it = variable_item_list_add(app->ssid_menu, "SSID", 16, sc, app);
+    variable_item_set_current_value_index(it, app->d_s);
+    snprintf(a, sizeof(a), "%u", app->d_s);
+    variable_item_set_current_value_text(it, a);
+
+    variable_item_list_add(app->ssid_menu, "Send", 0, NULL, NULL);
+    variable_item_list_set_selected_item(app->ssid_menu, 0);
 }
 
 static void mmenu(FlipperHamApp* app)
@@ -952,6 +1010,9 @@ static void cx(void* context, InputType input_type, uint32_t index)
 {
     FlipperHamApp* app = context;
     uint8_t i;
+    uint8_t s;
+    bool d;
+    char a[CALL_LEN];
 
     i = index - FlipperHamCallIndexBase;
     if(i >= CALL_N) return;
@@ -962,8 +1023,21 @@ static void cx(void* context, InputType input_type, uint32_t index)
         {
             app->d_i = i;
             app->go_v = FlipperHamViewMessage;
-            app->send_requested = true;
-            view_dispatcher_stop(app->view_dispatcher);
+            if(csplit(app->calls[i], a, &s, &d))
+            {
+                if(d)
+                {
+                    app->d_s = s;
+                    app->send_requested = true;
+                    view_dispatcher_stop(app->view_dispatcher);
+                }
+                else
+                {
+                    app->d_s = 0;
+                    ssidfix(app);
+                    view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewSsid);
+                }
+            }
 
 
             return;
@@ -1013,64 +1087,115 @@ static void csave(void* context)
     view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewCall);
 }
 
-static bool cval(char* s)
+static bool csplit(const char* s, char* out, uint8_t* ssid, bool* has_ssid)
 {
     char a[CALL_LEN];
     uint8_t i;
     uint8_t j;
+    uint8_t k;
     uint8_t n;
-    uint8_t ssid;
     bool dash;
 
     i = 0;
     j = 0;
     n = 0;
-    ssid = 0;
     dash = false;
 
-    while(s[i] && s[i] != '-') {
+    while(s[i] && s[i] != '-' && s[i] != '_') {
         char c = s[i];
 
         if(c >= 'a' && c <= 'z') c -= 32;
         if(!((c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9'))) return false;
-        if(j >= 6) return false;
+        if(j >= CALL_LEN - 1) return false;
 
         a[j++] = c;
         i++;
     }
 
-    if(!j) return false;
+    if(s[i] == '_') dash = true;
+    if(s[i] == '-') dash = true;
 
-    if(s[i] == '-') {
-        uint8_t d = 0;
-        dash = true;
-        i++;
-
-        while(s[i]) {
-            if(s[i] < '0' || s[i] > '9') return false;
-            ssid = (ssid * 10) + (s[i] - '0');
-            d++;
-            i++;
-        }
-
-        if(!d) return false;
-        if(d > 2) return false;
-        if(ssid > 15) return false;
-    }
-    else
+    if(!dash && j <= 6)
     {
-        ssid = 0;
+        if(!j) return false;
+        a[j] = 0;
+        snprintf(out, CALL_LEN, "%s", a);
+        *has_ssid = false;
+        *ssid = 0;
+        return true;
     }
 
-    a[j++] = '-';
-    if(ssid >= 10) a[j++] = '0' + (ssid / 10);
-    a[j++] = '0' + (ssid % 10);
+    if(!dash)
+    {
+        k = j;
+        while(k && a[k - 1] >= '0' && a[k - 1] <= '9') k--;
+        if(k == j) return false;
+        if(k > 6) return false;
+        if(j - k > 2) return false;
+        if(!k) return false;
+
+        n = 0;
+        for(i = k; i < j; i++) n = (n * 10) + (a[i] - '0');
+        if(n > 15) return false;
+
+        a[k] = 0;
+        snprintf(out, CALL_LEN, "%s", a);
+        *has_ssid = true;
+        *ssid = n;
+        return true;
+    }
+
+    if(j > 6) return false;
+    if(!j) return false;
+    i++;
+    if(!s[i]) return false;
+
+    n = 0;
+    k = 0;
+
+    while(s[i]) {
+        char c = s[i];
+
+        if(c >= 'a' && c <= 'z') c -= 32;
+        if(c < '0' || c > '9') return false;
+        n = (n * 10) + (c - '0');
+        k++;
+        i++;
+    }
+
+    if(!k) return false;
+    if(k > 2) return false;
+    if(n > 15) return false;
+
     a[j] = 0;
+    snprintf(out, CALL_LEN, "%s", a);
+    *has_ssid = true;
+    *ssid = n;
+    return true;
+}
 
-    snprintf(s, CALL_LEN, "%s", a);
+static bool cval(char* s)
+{
+    char a[CALL_LEN];
+    uint8_t b;
+    uint8_t i;
+    uint8_t j;
+    bool d;
 
-    UNUSED(n);
-    UNUSED(dash);
+    if(!csplit(s, a, &b, &d)) return false;
+
+    if(d)
+    {
+        i = 0;
+        j = 0;
+        while(a[i]) s[j++] = a[i++];
+        s[j++] = '-';
+        if(b >= 10) s[j++] = '0' + (b / 10);
+        s[j++] = '0' + (b % 10);
+        s[j] = 0;
+    }
+    else snprintf(s, CALL_LEN, "%s", a);
+
     return true;
 }
 
@@ -1168,7 +1293,12 @@ static void txstart(FlipperHamApp* app)
 {
     char a[96];
     char b;
+    char c[CALL_LEN];
+    char d2[CALL_LEN];
+    uint8_t j;
     uint16_t i;
+    uint8_t s;
+    bool d;
 
     app->tx_done = false;
     app->segment_index = 0;
@@ -1226,7 +1356,19 @@ static void txstart(FlipperHamApp* app)
         if(!app->calls_used[app->d_i]) return;
         if(!app->calls[app->d_i][0]) return;
 
-        snprintf(a, sizeof(a), ":%-9s:%s", app->calls[app->d_i], app->message[app->s_i]);
+        if(!csplit(app->calls[app->d_i], c, &s, &d)) return;
+        if(!d) s = app->d_s;
+
+        j = 0;
+        while(c[j]) {
+            d2[j] = c[j];
+            j++;
+        }
+        d2[j++] = '-';
+        if(s >= 10) d2[j++] = '0' + (s / 10);
+        d2[j++] = '0' + (s % 10);
+        d2[j] = 0;
+        snprintf(a, sizeof(a), ":%-9s:%s", d2, app->message[app->s_i]);
     }
 
     packet_init(app->pkt);
@@ -1330,6 +1472,7 @@ static FlipperHamApp* flipperham_app_alloc(void) {
     app->status_menu = submenu_alloc();
     app->message_menu = submenu_alloc();
     app->call_menu = submenu_alloc();
+    app->ssid_menu = variable_item_list_alloc();
     app->text_input = text_input_alloc();
 
         app->view_port = NULL;
@@ -1343,6 +1486,7 @@ static FlipperHamApp* flipperham_app_alloc(void) {
         app->st_i = 0;
         app->m_i = 0;
         app->d_i = 0;
+        app->d_s = 0;
         app->c_i = 0;
         app->go_v = FlipperHamViewMenu;
         app->txt = 0;
@@ -1367,6 +1511,7 @@ static FlipperHamApp* flipperham_app_alloc(void) {
     stmenu(app);
     mmenu(app);
     cmenu(app);
+    ssidfix(app);
 
 
     view_set_previous_callback(submenu_get_view(app->submenu), flipperham_exit_callback);
@@ -1375,7 +1520,9 @@ static FlipperHamApp* flipperham_app_alloc(void) {
     view_set_previous_callback(submenu_get_view(app->status_menu), flipperham_status_exit_callback);
     view_set_previous_callback(submenu_get_view(app->message_menu), flipperham_message_exit_callback);
     view_set_previous_callback(submenu_get_view(app->call_menu), flipperham_call_exit_callback);
+    view_set_previous_callback(variable_item_list_get_view(app->ssid_menu), flipperham_ssid_exit_callback);
     view_set_previous_callback(text_input_get_view(app->text_input), flipperham_text_exit_callback);
+    variable_item_list_set_enter_callback(app->ssid_menu, se, app);
 
 
     view_dispatcher_add_view( app->view_dispatcher, FlipperHamViewMenu, submenu_get_view(app->submenu));
@@ -1384,6 +1531,7 @@ static FlipperHamApp* flipperham_app_alloc(void) {
     view_dispatcher_add_view( app->view_dispatcher, FlipperHamViewStatus, submenu_get_view(app->status_menu));
     view_dispatcher_add_view( app->view_dispatcher, FlipperHamViewMessage, submenu_get_view(app->message_menu));
     view_dispatcher_add_view( app->view_dispatcher, FlipperHamViewCall, submenu_get_view(app->call_menu));
+    view_dispatcher_add_view( app->view_dispatcher, FlipperHamViewSsid, variable_item_list_get_view(app->ssid_menu));
     view_dispatcher_add_view( app->view_dispatcher, FlipperHamViewTextInput, text_input_get_view(app->text_input));
     view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewMenu);
 
@@ -1401,6 +1549,7 @@ static void flipperham_menu_free(FlipperHamApp* app)
         view_dispatcher_remove_view(app->view_dispatcher, FlipperHamViewStatus);
         view_dispatcher_remove_view(app->view_dispatcher, FlipperHamViewMessage);
         view_dispatcher_remove_view(app->view_dispatcher, FlipperHamViewCall);
+        view_dispatcher_remove_view(app->view_dispatcher, FlipperHamViewSsid);
         view_dispatcher_remove_view(app->view_dispatcher, FlipperHamViewTextInput);
         view_dispatcher_free(app->view_dispatcher);
         app->view_dispatcher = NULL;
@@ -1440,6 +1589,12 @@ static void flipperham_menu_free(FlipperHamApp* app)
     {
         submenu_free(app->call_menu);
         app->call_menu = NULL;
+    }
+
+    if(app->ssid_menu)
+    {
+        variable_item_list_free(app->ssid_menu);
+        app->ssid_menu = NULL;
     }
 
     if(app->text_input)
