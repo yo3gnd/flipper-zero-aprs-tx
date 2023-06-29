@@ -163,6 +163,7 @@ typedef struct
     volatile bool tx_started;
     volatile bool tx_done;
     volatile bool tx_allowed;
+    bool done_w;
     bool send_requested;
     bool repeat_w;
     uint8_t encoding_index;
@@ -1242,7 +1243,7 @@ static void flipperham_draw_callback(Canvas* canvas, void* context)
 {
     FlipperHamApp* app = context;
     char a[16];
-    uint32_t n, w;
+    uint32_t n, w, m;
 
     canvas_clear(canvas);
     canvas_set_font(canvas, FontPrimary);
@@ -1253,14 +1254,14 @@ static void flipperham_draw_callback(Canvas* canvas, void* context)
         return;
     }
 
-
-
-    if(app->tx_done) {
+    if(app->done_w) {
         canvas_draw_str_aligned(canvas, 64, 32, AlignCenter, AlignCenter, "Done");
         return;
     }
 
-        canvas_draw_str_aligned(canvas, 64, 24, AlignCenter, AlignCenter, "Sending...");
+    if(app->repeat_n >= 4) canvas_draw_str_aligned(canvas, 64, 24, AlignCenter, AlignCenter, "Sending...");
+    else if(app->repeat_n > 1) canvas_draw_str_aligned(canvas, 64, 26, AlignCenter, AlignCenter, "Sending...");
+    else canvas_draw_str_aligned(canvas, 64, 32, AlignCenter, AlignCenter, "Sending...");
 
     if(app->repeat_n > 1)
     {
@@ -1274,7 +1275,8 @@ static void flipperham_draw_callback(Canvas* canvas, void* context)
     if(app->repeat_n >= 4)
     {
         n = furi_get_tick() - app->repeat_t0;
-        if(n > 15000) n = 15000;
+        m = (app->repeat_n >= 5) ? 15000 : 8000;
+        n = (n > m) ? m : n;
 
         /* bar frame */
         canvas_draw_box(canvas, 24, 31, 80, 1);
@@ -1283,7 +1285,7 @@ static void flipperham_draw_callback(Canvas* canvas, void* context)
         canvas_draw_box(canvas, 104, 32, 1, 3);
 
         /* leave corners dead so it looks round-ish */
-        w = (n * 80UL) / 15000UL;
+        w = (n * 80UL) / m;
         if(w) canvas_draw_box(canvas, 24, 32, w, 3);
     }
 }
@@ -1546,6 +1548,7 @@ static FlipperHamApp* flipperham_app_alloc(void) {
         app->tx_started = false;
         app->tx_allowed = true;
         app->tx_done = false;
+        app->done_w = false;
         app->send_requested = false;
         app->repeat_w = false;
         app->encoding_index = FlipperHamModemProfileDefault;
@@ -1736,6 +1739,7 @@ static void flipperham_send_hardcoded_message(FlipperHamApp* app)
     app->repeat_t0 = furi_get_tick();
     app->repeat_to = 0;
     app->repeat_w = false;
+    app->done_w = false;
 
     for(i = 0; i < app->repeat_n; i++)
     {
@@ -1746,6 +1750,7 @@ static void flipperham_send_hardcoded_message(FlipperHamApp* app)
         /* flipperham_load_first_segment(app); // old table */
         app->tx_started = false;
         app->tx_allowed = true;
+        app->done_w = false;
 
         view_port_update(app->view_port);
         furi_delay_ms(100);
@@ -1784,6 +1789,7 @@ static void flipperham_send_hardcoded_message(FlipperHamApp* app)
     }
 
     app->repeat_w = false;
+    app->done_w = true;
     app->tx_done = true;
     view_port_update(app->view_port);
     furi_delay_ms(750);
