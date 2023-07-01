@@ -152,6 +152,8 @@ typedef struct
     Submenu* status_menu;
     Submenu* message_menu;
     Submenu* call_menu;
+    Submenu* book_menu;
+    Submenu* c2_menu;
     VariableItemList* settings_menu;
     VariableItemList* ssid_menu;
     TextInput* text_input;
@@ -197,11 +199,13 @@ typedef struct
       uint8_t d_i;  // dest
     uint8_t d_s;
     uint8_t c_i;
+    uint8_t cb_i;
     uint8_t txt;
     char b_edit[TXT_LEN];
     char st_edit[TXT_LEN];
     char m_edit[TXT_LEN];
     char c_edit[CALL_LEN];
+    char c2_h[24];
     FlipperHamRuntimeTx tx;
 } FlipperHamApp;
 
@@ -215,6 +219,8 @@ enum
     FlipperHamViewMessage,
     FlipperHamViewSsid,
     FlipperHamViewCall,
+    FlipperHamViewBook,
+    FlipperHamViewC2,
     FlipperHamViewTextInput,
 };
 
@@ -222,6 +228,7 @@ enum
 {
     FlipperHamMenuIndexSend = 0,
     FlipperHamMenuIndexSettings,
+    FlipperHamMenuIndexCallbook,
 };
 
 enum
@@ -253,6 +260,19 @@ enum
 {
     FlipperHamMessageIndexAdd = 0,
     FlipperHamMessageIndexBase = 400,
+};
+
+enum
+{
+    FlipperHamBookIndexAdd = 0,
+    FlipperHamBookIndexBase = 500,
+};
+
+enum
+{
+    FlipperHamC2IndexEdit = 0,
+    FlipperHamC2IndexDelete,
+    FlipperHamC2IndexCopy,
 };
 
 static const FlipperHamPreset flipperham_presets[] = 
@@ -327,6 +347,20 @@ static uint32_t flipperham_call_exit_callback(void* context)
     return FlipperHamViewSend;
 }
 
+static uint32_t bookx(void* context) 
+{
+    UNUSED(context);
+
+    return FlipperHamViewMenu;
+}
+
+static uint32_t c2x(void* context) 
+{
+    UNUSED(context);
+
+    return FlipperHamViewBook;
+}
+
 static void flipperham_bulletin_callback(void* context, uint32_t index);
 static void bx(void* context, InputType input_type, uint32_t index);
 static void st(void* context, uint32_t index);
@@ -335,6 +369,8 @@ static void mx(void* context, InputType input_type, uint32_t index);
 static void m(void* context, uint32_t index);
 static void cx(void* context, InputType input_type, uint32_t index);
 static void cl(void* context, uint32_t index);
+static void cb(void* context, uint32_t index);
+static void c2(void* context, uint32_t index);
 static void bsave(void* context);
 static void stsave(void* context);
 static void msave(void* context);
@@ -345,6 +381,8 @@ static void bfix(FlipperHamApp* app);
 static void stfix(FlipperHamApp* app);
 static void mfix(FlipperHamApp* app);
 static void cfix(FlipperHamApp* app);
+static void bkmenu(FlipperHamApp* app);
+static void c2m(FlipperHamApp* app);
 static void sc(VariableItem* item);
 static void se(void* context, uint32_t index);
 static void smenu(FlipperHamApp* app);
@@ -355,6 +393,7 @@ static uint32_t flipperham_text_exit_callback(void* context)
     FlipperHamApp* app = context;
 
     if(app->txt == 3) return FlipperHamViewMessage;
+    if(app->txt == 4) return FlipperHamViewBook;
     if(app->txt == 2) return FlipperHamViewCall;
     if(app->txt) return FlipperHamViewStatus;
     return FlipperHamViewBulletin;
@@ -538,12 +577,13 @@ static void cfgload(FlipperHamApp* app)
     free(c);
 }
 
-static void flipperham_menu_callback(void* context, uint32_t index) 
+static void flipperham_menu_callback(void* context, uint32_t index)
 {
     FlipperHamApp* app = context;
 
     if(index == FlipperHamMenuIndexSend) view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewSend);
     if(index == FlipperHamMenuIndexSettings) view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewSettings);
+    if(index == FlipperHamMenuIndexCallbook) view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewBook);
 
 }
 
@@ -626,6 +666,31 @@ static void cmenu(FlipperHamApp* app)
     }
 }
 
+static void bkmenu(FlipperHamApp* app)
+{
+    uint8_t i;
+
+    submenu_reset(app->book_menu);
+    submenu_add_item( app->book_menu, "Add new callsign...", FlipperHamBookIndexAdd, cb, app);
+
+    for(i = 0; i < CALL_N; i++)
+    {
+        if(!app->calls_used[i]) continue;
+        if(!app->calls[i][0]) continue;
+
+        submenu_add_item( app->book_menu, app->calls[i], FlipperHamBookIndexBase + i, cb, app);
+    }
+}
+
+static void c2m(FlipperHamApp* app)
+{
+    submenu_reset(app->c2_menu);
+    submenu_set_header(app->c2_menu, app->c2_h);
+    submenu_add_item( app->c2_menu, "Edit", FlipperHamC2IndexEdit, c2, app);
+    submenu_add_item( app->c2_menu, "Delete", FlipperHamC2IndexDelete, c2, app);
+    submenu_add_item( app->c2_menu, "Copy", FlipperHamC2IndexCopy, c2, app);
+}
+
 static void cfix(FlipperHamApp* app)
 {
     uint8_t i;
@@ -639,6 +704,61 @@ static void cfix(FlipperHamApp* app)
 
         if(app->calls_used[i]) app->calls_n++;
     }
+}
+
+static bool cpy(FlipperHamApp* app)
+{
+    char a[CALL_LEN];
+    char b[CALL_LEN];
+    uint8_t i, j, s, k, p, x;
+    bool d;
+    bool f;
+
+    if(app->cb_i >= CALL_N) return false;
+    if(!app->calls_used[app->cb_i]) return false;
+    if(!app->calls[app->cb_i][0]) return false;
+    if(!csplit(app->calls[app->cb_i], a, &s, &d)) return false;
+
+    k = d ? (s + 1) : 0;
+
+    for(i = 0; i < 16; i++)
+    {
+        s = (k + i) & 15;
+        p = 0;
+        j = 0;
+        while(a[j]) b[p++] = a[j++];
+        b[p++] = '-';
+        if(s >= 10) b[p++] = '0' + (s / 10);
+        b[p++] = '0' + (s % 10);
+        b[p] = 0;
+        f = false;
+
+        for(x = 0; x < CALL_N; x++)
+        {
+            if(x == app->cb_i) continue;
+            if(!app->calls_used[x]) continue;
+            if(strcmp(app->calls[x], b)) continue;
+            f = true;
+            break;
+        }
+
+        if(f) continue;
+
+        for(j = 0; j < CALL_N; j++)
+            if(!app->calls_used[j] || !app->calls[j][0]) {
+                snprintf(app->calls[j], sizeof(app->calls[j]), "%s", b);
+                app->calls_used[j] = 1;
+                cfix(app);
+                cfgsave(app);
+                cmenu(app);
+                bkmenu(app);
+                return true;
+            }
+
+        break;
+    }
+
+    return false;
 }
 
 static void sc(VariableItem* item)
@@ -1046,6 +1166,40 @@ static void cl(void* context, uint32_t index)
     view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewTextInput);
 }
 
+static void cb(void* context, uint32_t index)
+{
+    FlipperHamApp* app = context;
+    uint8_t i;
+
+    if(index == FlipperHamBookIndexAdd)
+    {
+        app->c_i = 0xff;
+
+        for(i = 0; i < CALL_N; i++)
+            if(!app->calls_used[i] || !app->calls[i][0]) {
+                app->c_i = i;
+                break;
+            }
+
+        if(app->c_i == 0xff) return;
+
+        app->c_edit[0] = 0; app->txt = 4;
+        text_input_reset(app->text_input);
+        text_input_set_header_text(app->text_input, "Callsign");
+        text_input_set_result_callback(app->text_input, csave, app, app->c_edit, sizeof(app->c_edit), true);
+        view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewTextInput);
+        return;
+    }
+
+    index -= FlipperHamBookIndexBase;
+    if(index >= CALL_N) return;
+
+    app->cb_i = index;
+    snprintf(app->c2_h, sizeof(app->c2_h), "%s", app->calls[index]);
+    c2m(app);
+    view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewC2);
+}
+
 static void cx(void* context, InputType input_type, uint32_t index)
 {
     FlipperHamApp* app = context;
@@ -1112,7 +1266,8 @@ static void csave(void* context)
     else
     {
         if(!cval(app->c_edit)) {
-            view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewCall);
+            if(app->txt == 4) view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewBook);
+            else view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewCall);
             return;
         }
 
@@ -1123,8 +1278,51 @@ static void csave(void* context)
     cfix(app);
     cfgsave(app);
     cmenu(app);
+    bkmenu(app);
 
-    view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewCall);
+    if(app->txt == 4) view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewBook);
+    else view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewCall);
+}
+
+static void c2(void* context, uint32_t index)
+{
+    FlipperHamApp* app = context;
+
+    if(app->cb_i >= CALL_N) return;
+
+    if(index == FlipperHamC2IndexEdit)
+    {
+        app->c_i = app->cb_i; snprintf(app->c_edit, sizeof(app->c_edit), "%s", app->calls[app->cb_i]); app->txt = 4;
+        text_input_reset(app->text_input);
+        text_input_set_header_text(app->text_input, "Callsign");
+        text_input_set_result_callback(app->text_input, csave, app, app->c_edit, sizeof(app->c_edit), true);
+        view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewTextInput);
+        return;
+    }
+
+    if(index == FlipperHamC2IndexDelete)
+    {
+        app->calls[app->cb_i][0] = 0;
+        app->calls_used[app->cb_i] = 0;
+        cfix(app);
+        cfgsave(app);
+        cmenu(app);
+        bkmenu(app);
+        view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewBook);
+        return;
+    }
+
+    if(index != FlipperHamC2IndexCopy) return;
+
+    if(cpy(app))
+    {
+        view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewBook);
+        return;
+    }
+
+    snprintf(app->c2_h, sizeof(app->c2_h), "No SSID free");
+    c2m(app);
+    view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewC2);
 }
 
 static bool csplit(const char* s, char* out, uint8_t* ssid, bool* has_ssid)
@@ -1540,6 +1738,8 @@ static FlipperHamApp* flipperham_app_alloc(void) {
     app->status_menu = submenu_alloc();
     app->message_menu = submenu_alloc();
     app->call_menu = submenu_alloc();
+    app->book_menu = submenu_alloc();
+    app->c2_menu = submenu_alloc();
     app->settings_menu = variable_item_list_alloc();
     app->ssid_menu = variable_item_list_alloc();
     app->text_input = text_input_alloc();
@@ -1561,6 +1761,8 @@ static FlipperHamApp* flipperham_app_alloc(void) {
         app->d_i = 0;
         app->d_s = 0;
         app->c_i = 0;
+        app->cb_i = 0;
+        app->c2_h[0] = 0;
         app->go_v = FlipperHamViewMenu;
         app->txt = 0;
         app->pkt = malloc(sizeof(Packet));
@@ -1573,6 +1775,7 @@ static FlipperHamApp* flipperham_app_alloc(void) {
 
     submenu_add_item( app->submenu, "Send", FlipperHamMenuIndexSend, flipperham_menu_callback, app);
     submenu_add_item( app->submenu, "Settings", FlipperHamMenuIndexSettings, flipperham_menu_callback, app);
+    submenu_add_item( app->submenu, "Callbook", FlipperHamMenuIndexCallbook, flipperham_menu_callback, app);
 
 
     submenu_add_item( app->send_menu, "Message", FlipperHamSendIndexMessage, flipperham_send_callback, app);
@@ -1584,6 +1787,7 @@ static FlipperHamApp* flipperham_app_alloc(void) {
     stmenu(app);
     mmenu(app);
     cmenu(app);
+    bkmenu(app);
     rmenu(app);
     ssidfix(app);
 
@@ -1595,6 +1799,8 @@ static FlipperHamApp* flipperham_app_alloc(void) {
     view_set_previous_callback(submenu_get_view(app->status_menu), flipperham_status_exit_callback);
     view_set_previous_callback(submenu_get_view(app->message_menu), flipperham_message_exit_callback);
     view_set_previous_callback(submenu_get_view(app->call_menu), flipperham_call_exit_callback);
+    view_set_previous_callback(submenu_get_view(app->book_menu), bookx);
+    view_set_previous_callback(submenu_get_view(app->c2_menu), c2x);
     view_set_previous_callback(variable_item_list_get_view(app->ssid_menu), flipperham_ssid_exit_callback);
     view_set_previous_callback(text_input_get_view(app->text_input), flipperham_text_exit_callback);
     variable_item_list_set_enter_callback(app->ssid_menu, se, app);
@@ -1607,6 +1813,8 @@ static FlipperHamApp* flipperham_app_alloc(void) {
     view_dispatcher_add_view( app->view_dispatcher, FlipperHamViewStatus, submenu_get_view(app->status_menu));
     view_dispatcher_add_view( app->view_dispatcher, FlipperHamViewMessage, submenu_get_view(app->message_menu));
     view_dispatcher_add_view( app->view_dispatcher, FlipperHamViewCall, submenu_get_view(app->call_menu));
+    view_dispatcher_add_view( app->view_dispatcher, FlipperHamViewBook, submenu_get_view(app->book_menu));
+    view_dispatcher_add_view( app->view_dispatcher, FlipperHamViewC2, submenu_get_view(app->c2_menu));
     view_dispatcher_add_view( app->view_dispatcher, FlipperHamViewSsid, variable_item_list_get_view(app->ssid_menu));
     view_dispatcher_add_view( app->view_dispatcher, FlipperHamViewTextInput, text_input_get_view(app->text_input));
     view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewMenu);
@@ -1626,6 +1834,8 @@ static void flipperham_menu_free(FlipperHamApp* app)
         view_dispatcher_remove_view(app->view_dispatcher, FlipperHamViewStatus);
         view_dispatcher_remove_view(app->view_dispatcher, FlipperHamViewMessage);
         view_dispatcher_remove_view(app->view_dispatcher, FlipperHamViewCall);
+        view_dispatcher_remove_view(app->view_dispatcher, FlipperHamViewBook);
+        view_dispatcher_remove_view(app->view_dispatcher, FlipperHamViewC2);
         view_dispatcher_remove_view(app->view_dispatcher, FlipperHamViewSsid);
         view_dispatcher_remove_view(app->view_dispatcher, FlipperHamViewTextInput);
         view_dispatcher_free(app->view_dispatcher);
@@ -1672,6 +1882,18 @@ static void flipperham_menu_free(FlipperHamApp* app)
     {
         submenu_free(app->call_menu);
         app->call_menu = NULL;
+    }
+
+    if(app->book_menu) 
+    {
+        submenu_free(app->book_menu);
+        app->book_menu = NULL;
+    }
+
+    if(app->c2_menu) 
+    {
+        submenu_free(app->c2_menu);
+        app->c2_menu = NULL;
     }
 
     if(app->ssid_menu)
