@@ -29,6 +29,8 @@ static void mx0(void* context, uint32_t index);
 #define CALL_LEN      10
 #define CFG_DIR       "/ext/apps_data/aprstx"
 #define CFG_FILE      "/ext/apps_data/aprstx/cfg.bin"
+#define CALLBOOK_DIR  "/ham"
+#define CALLBOOK_FILE "/ham/callbook.txt"
 
 typedef struct {
     const char* name;
@@ -383,6 +385,8 @@ static void mfix(FlipperHamApp* app);
 static void cfix(FlipperHamApp* app);
 static void bkmenu(FlipperHamApp* app);
 static void c2m(FlipperHamApp* app);
+static void cloadtxt(FlipperHamApp* app);
+static void csavetxt(FlipperHamApp* app);
 static void sc(VariableItem* item);
 static void se(void* context, uint32_t index);
 static void smenu(FlipperHamApp* app);
@@ -453,6 +457,7 @@ static void cfgsave(FlipperHamApp* app)
 
     c = malloc(sizeof(FlipperHamCfg));
     if(!c) return;
+    memset(c, 0, sizeof(FlipperHamCfg));
 
     c->encoding_index = app->encoding_index;
 
@@ -461,19 +466,16 @@ static void cfgsave(FlipperHamApp* app)
 
 
     memcpy(c->message, app->message, sizeof(c->message));
-    memcpy(c->calls, app->calls, sizeof(c->calls));
 
 
     memcpy(c->bulletin_used, app->bulletin_used, sizeof(c->bulletin_used));
     memcpy(c->status_used, app->status_used, sizeof(c->status_used));
     memcpy(c->message_used, app->message_used, sizeof(c->message_used));
-    memcpy(c->calls_used, app->calls_used, sizeof(c->calls_used));
 
     c->bulletin_n = app->bulletin_n;
     c->status_n = app->status_n;
 
     c->message_n = app->message_n;
-    c->calls_n = app->calls_n;
 
     storage = furi_record_open(RECORD_STORAGE);
     file = storage_file_alloc(storage);
@@ -488,6 +490,119 @@ static void cfgsave(FlipperHamApp* app)
     furi_record_close(RECORD_STORAGE);
 
     free(c);
+}
+
+static void csavetxt(FlipperHamApp* app)
+{
+    Storage* storage;
+    File* file;
+    uint8_t i;
+    uint16_t n;
+
+    storage = furi_record_open(RECORD_STORAGE);
+    file = storage_file_alloc(storage);
+
+    storage_common_mkdir(storage, CALLBOOK_DIR);
+
+    if(storage_file_open(file, CALLBOOK_FILE, FSAM_WRITE, FSOM_CREATE_ALWAYS))
+    {
+        for(i = 0; i < CALL_N; i++)
+        {
+            if(!app->calls_used[i]) continue;
+            if(!app->calls[i][0]) continue;
+
+            n = strlen(app->calls[i]);
+            if(n) storage_file_write(file, app->calls[i], n);
+            storage_file_write(file, "\n", 1);
+        }
+    }
+
+    storage_file_close(file);
+    storage_file_free(file);
+    furi_record_close(RECORD_STORAGE);
+}
+
+static void cloadtxt(FlipperHamApp* app)
+{
+    Storage* storage;
+    File* file;
+    char a[CALL_LEN + 4];
+    char c;
+    uint8_t i;
+    uint8_t j;
+
+    memset(app->calls, 0, sizeof(app->calls));
+    memset(app->calls_used, 0, sizeof(app->calls_used));
+    app->calls_n = 0;
+
+    storage = furi_record_open(RECORD_STORAGE);
+    file = storage_file_alloc(storage);
+
+    storage_common_mkdir(storage, CALLBOOK_DIR);
+
+    if(!storage_file_open(file, CALLBOOK_FILE, FSAM_READ, FSOM_OPEN_EXISTING))
+    {
+        storage_file_free(file);
+        furi_record_close(RECORD_STORAGE);
+        snprintf(app->calls[0], sizeof(app->calls[0]), "FL1PER");
+        snprintf(app->calls[1], sizeof(app->calls[1]), "YO3GND-12");
+        app->calls_used[0] = 1;
+        app->calls_used[1] = 1;
+        app->calls_n = 2;
+        csavetxt(app);
+        return;
+    }
+
+    i = 0;
+    j = 0;
+
+    while(storage_file_read(file, &c, 1) == 1)
+    {
+        if(c == '\r') continue;
+
+        if(c == '\n')
+        {
+            a[i] = 0;
+
+            if(a[0] && j < CALL_N && cval(a))
+            {
+                i = 0;
+                while(a[i]) {
+                    app->calls[j][i] = a[i];
+                    i++;
+                }
+                app->calls[j][i] = 0; app->calls_used[j] = 1;
+                j++;
+            }
+
+            i = 0;
+            continue;
+        }
+
+        if(i < sizeof(a) - 1) a[i++] = c;
+    }
+
+    if(i)
+    {
+        a[i] = 0;
+
+        if(a[0] && j < CALL_N && cval(a))
+        {
+            i = 0;
+            while(a[i]) {
+                app->calls[j][i] = a[i];
+                i++;
+            }
+            app->calls[j][i] = 0; app->calls_used[j] = 1;
+            j++;
+        }
+    }
+
+    storage_file_close(file);
+    storage_file_free(file);
+    furi_record_close(RECORD_STORAGE);
+
+    cfix(app);
 }
 
 static void cfgload(FlipperHamApp* app)
@@ -516,6 +631,7 @@ static void cfgload(FlipperHamApp* app)
         free(c);
         cfgdefs(app);
         cfgsave(app);
+        cloadtxt(app);
         return;
     }
 
@@ -528,6 +644,7 @@ static void cfgload(FlipperHamApp* app)
         free(c);
         cfgdefs(app);
         cfgsave(app);
+        cloadtxt(app);
         return;
     }
 
@@ -536,18 +653,15 @@ static void cfgload(FlipperHamApp* app)
     memcpy(app->bulletin, c->bulletin, sizeof(app->bulletin));
     memcpy(app->status, c->status, sizeof(app->status));
     memcpy(app->message, c->message, sizeof(app->message));
-    memcpy(app->calls, c->calls, sizeof(app->calls));
 
     memcpy(app->bulletin_used, c->bulletin_used, sizeof(app->bulletin_used));
     memcpy(app->status_used, c->status_used, sizeof(app->status_used));
     memcpy(app->message_used, c->message_used, sizeof(app->message_used));
-    memcpy(app->calls_used, c->calls_used, sizeof(app->calls_used));
 
     app->bulletin_n = c->bulletin_n;
     app->status_n = c->status_n;
 
     app->message_n = c->message_n;
-    app->calls_n = c->calls_n;
 
     if(app->encoding_index >= (sizeof(flipperham_modem_profiles) / sizeof(flipperham_modem_profiles[0])))
         app->encoding_index = FlipperHamModemProfileDefault;
@@ -559,20 +673,10 @@ static void cfgload(FlipperHamApp* app)
         app->message[i][TXT_LEN - 1] = 0;
     }
 
-    for(i = 0; i < CALL_N; i++)
-    {
-        app->calls[i][CALL_LEN - 1] = 0;
-
-        if(!app->calls[i][0]) continue;
-        if(cval(app->calls[i])) continue;
-
-        app->calls[i][0] = 0;
-    }
-
     bfix(app);
     stfix(app);
     mfix(app);
-    cfix(app);
+    cloadtxt(app);
 
     free(c);
 }
@@ -750,6 +854,7 @@ static bool cpy(FlipperHamApp* app)
                 app->calls_used[j] = 1;
                 cfix(app);
                 cfgsave(app);
+                csavetxt(app);
                 cmenu(app);
                 bkmenu(app);
                 return true;
@@ -1277,6 +1382,7 @@ static void csave(void* context)
 
     cfix(app);
     cfgsave(app);
+    csavetxt(app);
     cmenu(app);
     bkmenu(app);
 
@@ -1306,6 +1412,7 @@ static void c2(void* context, uint32_t index)
         app->calls_used[app->cb_i] = 0;
         cfix(app);
         cfgsave(app);
+        csavetxt(app);
         cmenu(app);
         bkmenu(app);
         view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewBook);
