@@ -61,21 +61,6 @@ typedef struct {
     uint16_t nrzi_len;
 } Packet;
 
-typedef struct {
-    const uint8_t* bits;
-    uint16_t bits_n;
-    uint16_t i;
-    uint8_t k;
-    uint8_t n;
-    int16_t c;
-    bool mark;
-    bool level;
-    uint16_t half_us;
-    uint16_t half_left_us;
-    uint16_t bit_left_us;
-    uint16_t part[4];
-} FlipperHamRuntimeTx;
-
 typedef struct
 {
     uint8_t encoding_index;
@@ -193,22 +178,21 @@ typedef struct
     uint8_t status_n;
     uint8_t message_n;
     uint8_t calls_n;
-    uint8_t s_i;
+    uint8_t tx_msg_index;
     uint8_t tx_t;
-    uint8_t b_i;
-    uint8_t st_i;
-    uint8_t m_i;
-      uint8_t d_i;  // dest
+    uint8_t bulletin_index;
+    uint8_t status_index;
+    uint8_t message_index;
+      uint8_t dst_call_index;  // dest
     uint8_t d_s;
-    uint8_t c_i;
-    uint8_t cb_i;
+    uint8_t edit_call_index;
+    uint8_t book_call_index;
     uint8_t txt;
     char b_edit[TXT_LEN];
     char st_edit[TXT_LEN];
     char m_edit[TXT_LEN];
     char c_edit[CALL_LEN];
     char c2_h[24];
-    FlipperHamRuntimeTx tx;
 } FlipperHamApp;
 
 enum 
@@ -818,10 +802,10 @@ static bool cpy(FlipperHamApp* app)
     bool d;
     bool f;
 
-    if(app->cb_i >= CALL_N) return false;
-    if(!app->calls_used[app->cb_i]) return false;
-    if(!app->calls[app->cb_i][0]) return false;
-    if(!csplit(app->calls[app->cb_i], a, &s, &d)) return false;
+    if(app->book_call_index >= CALL_N) return false;
+    if(!app->calls_used[app->book_call_index]) return false;
+    if(!app->calls[app->book_call_index][0]) return false;
+    if(!csplit(app->calls[app->book_call_index], a, &s, &d)) return false;
 
     k = d ? (s + 1) : 0;
 
@@ -839,7 +823,7 @@ static bool cpy(FlipperHamApp* app)
 
         for(x = 0; x < CALL_N; x++)
         {
-            if(x == app->cb_i) continue;
+            if(x == app->book_call_index) continue;
             if(!app->calls_used[x]) continue;
             if(strcmp(app->calls[x], b)) continue;
             f = true;
@@ -964,15 +948,15 @@ static void m(void* context, uint32_t index)
 
     if(index == FlipperHamMessageIndexAdd)
     {
-        app->m_i = 0xff;
+        app->message_index = 0xff;
 
         for(i = 0; i < TXT_N; i++)
             if(!app->message_used[i] || !app->message[i][0]) {
-                app->m_i = i;
+                app->message_index = i;
                 break;
             }
 
-        if(app->m_i == 0xff) return;
+        if(app->message_index == 0xff) return;
 
         app->m_edit[0] = 0;
     }
@@ -981,7 +965,7 @@ static void m(void* context, uint32_t index)
         i = index - FlipperHamMessageIndexBase;
         if(i >= TXT_N) return;
 
-        app->m_i = i;
+        app->message_index = i;
         snprintf(app->m_edit, sizeof(app->m_edit), "%s", app->message[i]);
     }
 
@@ -1005,7 +989,7 @@ static void mx(void* context, InputType input_type, uint32_t index)
     if(input_type == InputTypeShort)
     {
         app->tx_t = 2;
-        app->s_i = i;
+        app->tx_msg_index = i;
 
         view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewCall);
         return;
@@ -1013,14 +997,12 @@ static void mx(void* context, InputType input_type, uint32_t index)
 
     if(input_type != InputTypeLong) return;
 
-    app->m_i = i; snprintf(app->m_edit, sizeof(app->m_edit), "%s", app->message[i]); app->txt = 3;
-
+    app->message_index = i;
+    snprintf(app->m_edit, sizeof(app->m_edit), "%s", app->message[i]);
+    app->txt = 3;
     text_input_reset(app->text_input);
     text_input_set_header_text(app->text_input, "Message");
     text_input_set_result_callback(app->text_input, msave, app, app->m_edit, sizeof(app->m_edit), true);
-
-
-
     view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewTextInput);
 }
 
@@ -1029,7 +1011,7 @@ static void msave(void* context)
     FlipperHamApp* app = context;
     uint8_t i;
 
-    i = app->m_i;
+    i = app->message_index;
     if(i >= TXT_N) return;
 
     if(!app->m_edit[0])
@@ -1060,7 +1042,6 @@ static void flipperham_send_callback(void* context, uint32_t index)
     if(index == FlipperHamSendIndexBulletin)
         view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewBulletin);
 
-
     if(index == FlipperHamSendIndexStatus)
         view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewStatus);
 }
@@ -1072,15 +1053,15 @@ static void flipperham_bulletin_callback(void* context, uint32_t index)
 
     if(index != FlipperHamBulletinIndexAdd) return;
 
-    app->b_i = 0xff;
+    app->bulletin_index = 0xff;
 
     for(i = 0; i < TXT_N; i++)
         if(!app->bulletin_used[i]) {
-            app->b_i = i;
+            app->bulletin_index = i;
             break;
         }
 
-    if(app->b_i == 0xff) return;
+    if(app->bulletin_index == 0xff) return;
 
     app->b_edit[0] = 0;
     app->txt = 0;
@@ -1103,7 +1084,7 @@ static void bx(void* context, InputType input_type, uint32_t index)
     if(input_type == InputTypeShort)
     {
         app->tx_t = 0;
-        app->s_i = i;
+        app->tx_msg_index = i;
         app->go_v = FlipperHamViewBulletin;
         app->send_requested = true;
         view_dispatcher_stop(app->view_dispatcher);
@@ -1112,7 +1093,7 @@ static void bx(void* context, InputType input_type, uint32_t index)
 
     if(input_type != InputTypeLong) return;
 
-    app->b_i = i;
+    app->bulletin_index = i;
     snprintf(app->b_edit, sizeof(app->b_edit), "%s", app->bulletin[i]);
     app->txt = 0;
 
@@ -1128,7 +1109,7 @@ static void bsave(void* context)
     FlipperHamApp* app = context;
     uint8_t i;
 
-    i = app->b_i;
+    i = app->bulletin_index;
     if(i >= TXT_N) return;
 
     if(!app->b_edit[0])
@@ -1156,15 +1137,15 @@ static void st(void* context, uint32_t index)
 
     if(index != FlipperHamStatusIndexAdd) return;
 
-    app->st_i = 0xff;
+    app->status_index = 0xff;
 
     for(i = 0; i < TXT_N; i++)
         if(!app->status_used[i]) {
-            app->st_i = i;
+            app->status_index = i;
             break;
         }
 
-    if(app->st_i == 0xff) return;
+    if(app->status_index == 0xff) return;
 
     app->st_edit[0] = 0;
 
@@ -1188,7 +1169,7 @@ static void sx(void* context, InputType input_type, uint32_t index)
     if(input_type == InputTypeShort)
     {
         app->tx_t = 1;
-        app->s_i = i;
+        app->tx_msg_index = i;
         app->go_v = FlipperHamViewStatus;
         app->send_requested = true;
         view_dispatcher_stop(app->view_dispatcher);
@@ -1197,7 +1178,7 @@ static void sx(void* context, InputType input_type, uint32_t index)
 
     if(input_type != InputTypeLong) return;
 
-    app->st_i = i;
+    app->status_index = i;
     snprintf(app->st_edit, sizeof(app->st_edit), "%s", app->status[i]);
     app->txt = 1;
 
@@ -1213,7 +1194,7 @@ static void stsave(void* context)
     FlipperHamApp* app = context;
     uint8_t i;
 
-    i = app->st_i;
+    i = app->status_index;
     if(i >= TXT_N) return;
 
     if(!app->st_edit[0])
@@ -1241,15 +1222,15 @@ static void cl(void* context, uint32_t index)
 
     if(index == FlipperHamCallIndexAdd)
     {
-        app->c_i = 0xff;
+        app->edit_call_index = 0xff;
 
         for(i = 0; i < CALL_N; i++)
             if(!app->calls_used[i] || !app->calls[i][0]) {
-                app->c_i = i;
+                app->edit_call_index = i;
                 break;
             }
 
-        if(app->c_i == 0xff) return;
+        if(app->edit_call_index == 0xff) return;
 
         app->c_edit[0] = 0;
     }
@@ -1258,7 +1239,7 @@ static void cl(void* context, uint32_t index)
         i = index - FlipperHamCallIndexBase;
         if(i >= CALL_N) return;
 
-        app->c_i = i;
+        app->edit_call_index = i;
         snprintf(app->c_edit, sizeof(app->c_edit), "%s", app->calls[i]);
     }
 
@@ -1278,17 +1259,18 @@ static void cb(void* context, uint32_t index)
 
     if(index == FlipperHamBookIndexAdd)
     {
-        app->c_i = 0xff;
+        app->edit_call_index = 0xff;
 
         for(i = 0; i < CALL_N; i++)
             if(!app->calls_used[i] || !app->calls[i][0]) {
-                app->c_i = i;
+                app->edit_call_index = i;
                 break;
             }
 
-        if(app->c_i == 0xff) return;
+        if(app->edit_call_index == 0xff) return;
 
-        app->c_edit[0] = 0; app->txt = 4;
+        app->c_edit[0] = 0;
+        app->txt = 4;
         text_input_reset(app->text_input);
         text_input_set_header_text(app->text_input, "Callsign");
         text_input_set_result_callback(app->text_input, csave, app, app->c_edit, sizeof(app->c_edit), true);
@@ -1299,7 +1281,7 @@ static void cb(void* context, uint32_t index)
     index -= FlipperHamBookIndexBase;
     if(index >= CALL_N) return;
 
-    app->cb_i = index;
+    app->book_call_index = index;
     snprintf(app->c2_h, sizeof(app->c2_h), "%s", app->calls[index]);
     c2m(app);
     view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewC2);
@@ -1320,8 +1302,9 @@ static void cx(void* context, InputType input_type, uint32_t index)
     {
         if(app->tx_t == 2)
         {
-            app->d_i = i;
+            app->dst_call_index = i;
             app->go_v = FlipperHamViewMessage;
+
             if(csplit(app->calls[i], a, &s, &d))
             {
                 if(d)
@@ -1338,14 +1321,14 @@ static void cx(void* context, InputType input_type, uint32_t index)
                 }
             }
 
-
             return;
         }
     }
 
     if(input_type != InputTypeLong) return;
 
-    app->c_i = i; snprintf(app->c_edit, sizeof(app->c_edit), "%s", app->calls[i]);
+    app->edit_call_index = i;
+    snprintf(app->c_edit, sizeof(app->c_edit), "%s", app->calls[i]);
     app->txt = 2;
 
     text_input_reset(app->text_input);
@@ -1360,7 +1343,7 @@ static void csave(void* context)
     FlipperHamApp* app = context;
     uint8_t i;
 
-    i = app->c_i;
+    i = app->edit_call_index;
     if(i >= CALL_N) return;
 
     if(!app->c_edit[0])
@@ -1370,7 +1353,8 @@ static void csave(void* context)
     }
     else
     {
-        if(!cval(app->c_edit)) {
+        if(!cval(app->c_edit))
+        {
             if(app->txt == 4) view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewBook);
             else view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewCall);
             return;
@@ -1394,11 +1378,13 @@ static void c2(void* context, uint32_t index)
 {
     FlipperHamApp* app = context;
 
-    if(app->cb_i >= CALL_N) return;
+    if(app->book_call_index >= CALL_N) return;
 
     if(index == FlipperHamC2IndexEdit)
     {
-        app->c_i = app->cb_i; snprintf(app->c_edit, sizeof(app->c_edit), "%s", app->calls[app->cb_i]); app->txt = 4;
+        app->edit_call_index = app->book_call_index;
+        snprintf(app->c_edit, sizeof(app->c_edit), "%s", app->calls[app->book_call_index]);
+        app->txt = 4;
         text_input_reset(app->text_input);
         text_input_set_header_text(app->text_input, "Callsign");
         text_input_set_result_callback(app->text_input, csave, app, app->c_edit, sizeof(app->c_edit), true);
@@ -1408,8 +1394,8 @@ static void c2(void* context, uint32_t index)
 
     if(index == FlipperHamC2IndexDelete)
     {
-        app->calls[app->cb_i][0] = 0;
-        app->calls_used[app->cb_i] = 0;
+        app->calls[app->book_call_index][0] = 0;
+        app->calls_used[app->book_call_index] = 0;
         cfix(app);
         cfgsave(app);
         csavetxt(app);
@@ -1680,57 +1666,41 @@ static void txstart(FlipperHamApp* app)
     app->wave_len = 0;
     app->wave_carry = 0;
     app->wave_is_mark = true;
-    app->tx.bits = NULL;
-    app->tx.bits_n = 0;
-    app->tx.i = 0;
-    app->tx.k = 0;
-    app->tx.n = 0;
-    app->tx.c = 0;
-    app->tx.mark = true;
-    app->tx.level = true;
-    app->tx.half_us = 0;
-
-      app->tx.half_left_us = 0; // no
-      app->tx.bit_left_us = 0;
-      app->tx.part[0] = 0;
-      app->tx.part[1] = 0;
-      app->tx.part[2] = 0;
-      app->tx.part[3] = 0;
 
     if(!app->pkt) return;
     if(!app->wave) return;
-    if(app->s_i >= TXT_N) return;
+    if(app->tx_msg_index >= TXT_N) return;
 
-    /* bulleting message */
+    /* bulletin message */
     if(app->tx_t == 0)
     {
-        if(!app->bulletin_used[app->s_i]) return;
-        if(!app->bulletin[app->s_i][0]) return;
+        if(!app->bulletin_used[app->tx_msg_index]) return;
+        if(!app->bulletin[app->tx_msg_index][0]) return;
 
         bulletin_id = '0';
-        if(app->s_i < 10) bulletin_id = '0' + app->s_i;
-        else if(app->s_i < 16) bulletin_id = 'A' + (app->s_i - 10);
+        if(app->tx_msg_index < 10) bulletin_id = '0' + app->tx_msg_index;
+        else if(app->tx_msg_index < 16) bulletin_id = 'A' + (app->tx_msg_index - 10);
 
-        snprintf(message, sizeof(message), ":BLN%c     :%s", bulletin_id, app->bulletin[app->s_i]);
+        snprintf(message, sizeof(message), ":BLN%c     :%s", bulletin_id, app->bulletin[app->tx_msg_index]);
     }
     /* status message */
     else if(app->tx_t == 1)
     {
-        if(!app->status_used[app->s_i]) return;
-        if(!app->status[app->s_i][0]) return;
+        if(!app->status_used[app->tx_msg_index]) return;
+        if(!app->status[app->tx_msg_index][0]) return;
 
-        snprintf(message, sizeof(message), ">%s", app->status[app->s_i]);
+        snprintf(message, sizeof(message), ">%s", app->status[app->tx_msg_index]);
     }
-    /* type: aprs direct */
+    /* APRS direct */
     else
     {
-        if(app->d_i >= CALL_N) return;
-        if(!app->message_used[app->s_i]) return;
-        if(!app->message[app->s_i][0]) return;
-        if(!app->calls_used[app->d_i]) return;
-        if(!app->calls[app->d_i][0]) return;
+        if(app->dst_call_index >= CALL_N) return;
+        if(!app->message_used[app->tx_msg_index]) return;
+        if(!app->message[app->tx_msg_index][0]) return;
+        if(!app->calls_used[app->dst_call_index]) return;
+        if(!app->calls[app->dst_call_index][0]) return;
 
-        if(!csplit(app->calls[app->d_i], dst, &ssid, &has_ssid)) return;
+        if(!csplit(app->calls[app->dst_call_index], dst, &ssid, &has_ssid)) return;
         if(!has_ssid) ssid = app->d_s;
 
         j = 0;
@@ -1744,7 +1714,7 @@ static void txstart(FlipperHamApp* app)
         dst_full[j++] = '0' + (ssid % 10);
         dst_full[j] = 0;
 
-        snprintf(message, sizeof(message), ":%-9s:%s", dst_full, app->message[app->s_i]);
+        snprintf(message, sizeof(message), ":%-9s:%s", dst_full, app->message[app->tx_msg_index]);
     }
 
     packet_init(app->pkt);
@@ -1869,14 +1839,14 @@ static FlipperHamApp* flipperham_app_alloc(void) {
         app->encoding_index = FlipperHamModemProfileDefault;
         app->repeat_n = 1;
         app->repeat_i = 1;
-        app->s_i = 0;
+        app->tx_msg_index = 0;
         app->tx_t = 0;
-        app->st_i = 0;
-        app->m_i = 0;
-        app->d_i = 0;
+        app->status_index = 0;
+        app->message_index = 0;
+        app->dst_call_index = 0;
         app->d_s = 0;
-        app->c_i = 0;
-        app->cb_i = 0;
+        app->edit_call_index = 0;
+        app->book_call_index = 0;
         app->c2_h[0] = 0;
         app->go_v = FlipperHamViewMenu;
         app->txt = 0;
