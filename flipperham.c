@@ -160,9 +160,9 @@ typedef struct
     VariableItemList* ssid_menu;
     TextInput* text_input;
     ViewPort* view_port;
-    volatile uint16_t current_tone_hz;
-    volatile uint16_t current_half_period_us;
-    volatile uint16_t segment_index;
+    volatile uint16_t cur_tone_hz;
+    volatile uint16_t cur_half_us;
+    volatile uint16_t wave_i;
     volatile bool level;
     volatile bool tx_started;
     volatile bool tx_done;
@@ -175,9 +175,9 @@ typedef struct
     uint8_t repeat_i;
     Packet* pkt;
     uint16_t* wave;
-    uint16_t wave_n;
-    int16_t wave_c;
-    bool wave_mark;
+    uint16_t wave_len;
+    int16_t wave_carry;
+    bool wave_is_mark;
     uint32_t repeat_t0;
     uint32_t repeat_to;
     uint8_t go_v;
@@ -1597,7 +1597,8 @@ static void flipperham_draw_callback(Canvas* canvas, void* context)
 
 static uint16_t flipperham_segment_tone_hz(uint16_t duration_us)
 {
-    if(duration_us >= 300) {
+    if(duration_us >= 300)
+    {
         return flipperham_modem_profile->mark_hz;
     }
 
@@ -1606,57 +1607,57 @@ static uint16_t flipperham_segment_tone_hz(uint16_t duration_us)
 
 static void flipperham_load_first_segment(FlipperHamApp* app) 
 {
-    app->segment_index = 0;
+    app->wave_i = 0;
     app->level = true;
     app->tx_done = false;
-    app->current_half_period_us = 417;
-    app->current_tone_hz = flipperham_segment_tone_hz(app->current_half_period_us);
+    app->cur_half_us = 417;
+    app->cur_tone_hz = flipperham_segment_tone_hz(app->cur_half_us);
 }
 
-static bool add(FlipperHamApp* app, uint16_t a)
+static bool wave_add(FlipperHamApp* app, uint16_t value)
 {
-    int32_t b;
+    int32_t acc;
 
     if(!app->wave) return false;
-    /* cap generated edges */
-    if(app->wave_n >= 4096) return false;
+    if(app->wave_len >= 4096) return false;
 
-    b = a + app->wave_c;
-    a = (b + 16) / 33;
-    app->wave_c = b - ((int32_t)a * 33);
-    if(!a) return true;
+    acc = value + app->wave_carry;
+    value = (acc + 16) / 33;
+    app->wave_carry = acc - ((int32_t)value * 33);
+    if(!value) return true;
 
-    app->wave[app->wave_n++] = a;
+    app->wave[app->wave_len++] = value;
     return true;
 }
 
-static bool put(FlipperHamApp* app, uint8_t bit)
+static bool wave_put(FlipperHamApp* app, uint8_t bit)
 {
-    if(bit == 0) app->wave_mark = !app->wave_mark;
+    if(bit == 0) app->wave_is_mark = !app->wave_is_mark;
 
-    if(app->wave_mark)
+    if(app->wave_is_mark)
     {
-        if(!add(app, 13750)) return false;
-        if(!add(app, 13750)) return false;
+        if(!wave_add(app, 13750)) return false;
+        if(!wave_add(app, 13750)) return false;
     }
     else
     {
-        if(!add(app, 7500)) return false;
-        if(!add(app, 7500)) return false;
-        if(!add(app, 7500)) return false;
-        if(!add(app, 5000)) return false;
+        if(!wave_add(app, 7500)) return false;
+        if(!wave_add(app, 7500)) return false;
+        if(!wave_add(app, 7500)) return false;
+        if(!wave_add(app, 5000)) return false;
     }
 
     return true;
 }
 
-static bool flag3(FlipperHamApp* app)
+static bool wave_flag(FlipperHamApp* app)
 {
-    static const uint8_t a[] = {0, 1, 1, 1, 1, 1, 1, 0};
+    static const uint8_t flag[] = {0, 1, 1, 1, 1, 1, 1, 0};
     uint8_t i;
 
-    for(i = 0; i < sizeof(a); i++) {
-        if(!put(app, a[i])) return false;
+    for(i = 0; i < sizeof(flag); i++)
+    {
+        if(!wave_put(app, flag[i])) return false;
     }
 
     return true;
@@ -1664,21 +1665,21 @@ static bool flag3(FlipperHamApp* app)
 
 static void txstart(FlipperHamApp* app)
 {
-    char a[96];
-    char b;
-    char c[CALL_LEN];
-    char d2[CALL_LEN];
-    uint8_t j;
+    char message[96];
+    char bulletin_id;
+    char dst[CALL_LEN];
+    char dst_full[CALL_LEN];
     uint16_t i;
-    uint8_t s;
-    bool d;
+    uint8_t j;
+    uint8_t ssid;
+    bool has_ssid;
 
     app->tx_done = false;
-    app->segment_index = 0;
+    app->wave_i = 0;
     app->level = true;
-    app->wave_n = 0;
-    app->wave_c = 0;
-    app->wave_mark = true;
+    app->wave_len = 0;
+    app->wave_carry = 0;
+    app->wave_is_mark = true;
     app->tx.bits = NULL;
     app->tx.bits_n = 0;
     app->tx.i = 0;
@@ -1706,11 +1707,11 @@ static void txstart(FlipperHamApp* app)
         if(!app->bulletin_used[app->s_i]) return;
         if(!app->bulletin[app->s_i][0]) return;
 
-        b = '0';
-        if(app->s_i < 10) b = '0' + app->s_i;
-        else if(app->s_i < 16) b = 'A' + (app->s_i - 10);
+        bulletin_id = '0';
+        if(app->s_i < 10) bulletin_id = '0' + app->s_i;
+        else if(app->s_i < 16) bulletin_id = 'A' + (app->s_i - 10);
 
-        snprintf(a, sizeof(a), ":BLN%c     :%s", b, app->bulletin[app->s_i]);
+        snprintf(message, sizeof(message), ":BLN%c     :%s", bulletin_id, app->bulletin[app->s_i]);
     }
     /* status message */
     else if(app->tx_t == 1)
@@ -1718,7 +1719,7 @@ static void txstart(FlipperHamApp* app)
         if(!app->status_used[app->s_i]) return;
         if(!app->status[app->s_i][0]) return;
 
-        snprintf(a, sizeof(a), ">%s", app->status[app->s_i]);
+        snprintf(message, sizeof(message), ">%s", app->status[app->s_i]);
     }
     /* type: aprs direct */
     else
@@ -1729,47 +1730,59 @@ static void txstart(FlipperHamApp* app)
         if(!app->calls_used[app->d_i]) return;
         if(!app->calls[app->d_i][0]) return;
 
-        if(!csplit(app->calls[app->d_i], c, &s, &d)) return;
-        if(!d) s = app->d_s;
+        if(!csplit(app->calls[app->d_i], dst, &ssid, &has_ssid)) return;
+        if(!has_ssid) ssid = app->d_s;
 
         j = 0;
-        while(c[j]) {
-            d2[j] = c[j];
+        while(dst[j])
+        {
+            dst_full[j] = dst[j];
             j++;
         }
-        d2[j++] = '-';
-        if(s >= 10) d2[j++] = '0' + (s / 10);
-        d2[j++] = '0' + (s % 10);
-        d2[j] = 0;
-        snprintf(a, sizeof(a), ":%-9s:%s", d2, app->message[app->s_i]);
+        dst_full[j++] = '-';
+        if(ssid >= 10) dst_full[j++] = '0' + (ssid / 10);
+        dst_full[j++] = '0' + (ssid % 10);
+        dst_full[j] = 0;
+
+        snprintf(message, sizeof(message), ":%-9s:%s", dst_full, app->message[app->s_i]);
     }
 
     packet_init(app->pkt);
-    snprintf((char*)app->pkt->payload, sizeof(app->pkt->payload), "%s", a);
+    snprintf((char*)app->pkt->payload, sizeof(app->pkt->payload), "%s", message);
     app->pkt->payload_len = strlen((char*)app->pkt->payload);
     packet_make_ax25(app->pkt, MY_CALL, 0, MY_TOCALL, 0);
     packet_add_fcs(app->pkt);
     packet_stuff(app->pkt);
     packet_nrzi(app->pkt);
 
-    // 50ms mark
-    for(i = 0; i < 60 && put(app, 1); i++);
+    /* 50 ms mark */
+    for(i = 0; i < 60 && wave_put(app, 1); i++);
 
-    // preamble
-    for(i = 0; i < 50; i++) if(!flag3(app)) break;
-
-    // skip the flag at head and tail, add our own
-    for(i = 8; i + 8 < app->pkt->stuffed_len; i++) {
-        if(!put(app, app->pkt->stuffed[i])) break;
+    /* preamble */
+    for(i = 0; i < 50; i++)
+    {
+        if(!wave_flag(app)) break;
     }
 
-    // post
-    for(i = 0; i < 3; i++) if(!flag3(app)) break;
+    /* skip the flag at head and tail, add our own */
+    for(i = 8; i + 8 < app->pkt->stuffed_len; i++)
+    {
+        if(!wave_put(app, app->pkt->stuffed[i])) break;
+    }
 
-    if(app->wave_n) {
-        app->current_half_period_us = app->wave[0];
-        app->current_tone_hz = flipperham_segment_tone_hz(app->current_half_period_us);
-    } else {
+    /* post */
+    for(i = 0; i < 3; i++)
+    {
+        if(!wave_flag(app)) break;
+    }
+
+    if(app->wave_len)
+    {
+        app->cur_half_us = app->wave[0];
+        app->cur_tone_hz = flipperham_segment_tone_hz(app->cur_half_us);
+    }
+    else
+    {
         app->tx_done = true;
     }
 }
@@ -1778,31 +1791,26 @@ static LevelDuration edge_yield(void* context)
 {
     FlipperHamApp* app = context;
     LevelDuration ld;
-    uint16_t a;
+    uint16_t half_us;
 
     if(app->tx_done) return level_duration_reset();
 
-    /*
-    a = app->current_half_period_us;
-    app->current_tone_hz = flipperham_segment_tone_hz(a);
-    ld = level_duration_make(app->level, a);
-    */
-
-    if(app->segment_index >= app->wave_n) {
+    if(app->wave_i >= app->wave_len)
+    {
         app->tx_done = true;
         return level_duration_reset();
     }
 
-    a = app->wave[app->segment_index];
+    half_us = app->wave[app->wave_i];
 
-    app->current_half_period_us = a;
-    app->current_tone_hz = flipperham_segment_tone_hz(a);
-    ld = level_duration_make(app->level, a);
+    app->cur_half_us = half_us;
+    app->cur_tone_hz = flipperham_segment_tone_hz(half_us);
+    ld = level_duration_make(app->level, half_us);
 
     app->level = !app->level;
-    app->segment_index++;
+    app->wave_i++;
 
-    if(app->segment_index >= app->wave_n) app->tx_done = true;
+    if(app->wave_i >= app->wave_len) app->tx_done = true;
 
     return ld;
 }
