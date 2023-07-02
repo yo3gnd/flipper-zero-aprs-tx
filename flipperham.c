@@ -145,8 +145,6 @@ typedef struct
     VariableItemList* ssid_menu;
     TextInput* text_input;
     ViewPort* view_port;
-    volatile uint16_t cur_tone_hz;
-    volatile uint16_t cur_half_us;
     volatile uint16_t wave_i;
     volatile bool level;
     volatile bool tx_started;
@@ -154,7 +152,6 @@ typedef struct
     volatile bool tx_allowed;
     bool done_w;
     bool send_requested;
-    bool repeat_w;
     uint8_t encoding_index;
     uint8_t repeat_n;
     uint8_t repeat_i;
@@ -275,7 +272,6 @@ static const FlipperHamModemProfile flipperham_modem_profiles[] =
 };
 
 static const FlipperHamPreset* flipperham_preset = &flipperham_presets[FlipperHamPresetDefault];
-static const FlipperHamModemProfile* flipperham_modem_profile = &flipperham_modem_profiles[FlipperHamModemProfileDefault];
 
 static uint32_t flipperham_exit_callback(void* context) 
 {
@@ -1581,25 +1577,6 @@ static void flipperham_draw_callback(Canvas* canvas, void* context)
     }
 }
 
-static uint16_t flipperham_segment_tone_hz(uint16_t duration_us)
-{
-    if(duration_us >= 300)
-    {
-        return flipperham_modem_profile->mark_hz;
-    }
-
-    return flipperham_modem_profile->space_hz;
-}
-
-static void flipperham_load_first_segment(FlipperHamApp* app) 
-{
-    app->wave_i = 0;
-    app->level = true;
-    app->tx_done = false;
-    app->cur_half_us = 417;
-    app->cur_tone_hz = flipperham_segment_tone_hz(app->cur_half_us);
-}
-
 static bool wave_add(FlipperHamApp* app, uint16_t value)
 {
     int32_t acc;
@@ -1746,15 +1723,7 @@ static void txstart(FlipperHamApp* app)
         if(!wave_flag(app)) break;
     }
 
-    if(app->wave_len)
-    {
-        app->cur_half_us = app->wave[0];
-        app->cur_tone_hz = flipperham_segment_tone_hz(app->cur_half_us);
-    }
-    else
-    {
-        app->tx_done = true;
-    }
+    if(!app->wave_len) app->tx_done = true;
 }
 
 static LevelDuration edge_yield(void* context) 
@@ -1773,8 +1742,6 @@ static LevelDuration edge_yield(void* context)
 
     half_us = app->wave[app->wave_i];
 
-    app->cur_half_us = half_us;
-    app->cur_tone_hz = flipperham_segment_tone_hz(half_us);
     ld = level_duration_make(app->level, half_us);
 
     app->level = !app->level;
@@ -1835,7 +1802,6 @@ static FlipperHamApp* flipperham_app_alloc(void) {
         app->tx_done = false;
         app->done_w = false;
         app->send_requested = false;
-        app->repeat_w = false;
         app->encoding_index = FlipperHamModemProfileDefault;
         app->repeat_n = 1;
         app->repeat_i = 1;
@@ -1903,9 +1869,6 @@ static FlipperHamApp* flipperham_app_alloc(void) {
     view_dispatcher_add_view( app->view_dispatcher, FlipperHamViewSsid, variable_item_list_get_view(app->ssid_menu));
     view_dispatcher_add_view( app->view_dispatcher, FlipperHamViewTextInput, text_input_get_view(app->text_input));
     view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewMenu);
-
-    flipperham_load_first_segment(app);
-
     return app;
 }
 
@@ -2045,16 +2008,13 @@ static void flipperham_send_hardcoded_message(FlipperHamApp* app)
     app->repeat_i = 0;
     app->repeat_t0 = furi_get_tick();
     app->repeat_to = 0;
-    app->repeat_w = false;
     app->done_w = false;
 
     for(i = 0; i < app->repeat_n; i++)
     {
         app->repeat_i = i + 1;
-        app->repeat_w = false;
 
         txstart(app);
-        /* flipperham_load_first_segment(app); // old table */
         app->tx_started = false;
         app->tx_allowed = true;
         app->done_w = false;
@@ -2081,7 +2041,6 @@ static void flipperham_send_hardcoded_message(FlipperHamApp* app)
 
         if(i + 1 >= app->repeat_n) break;
 
-        app->repeat_w = true;
         app->repeat_to = a[i + 1];
         app->tx_done = false;
 
@@ -2095,7 +2054,6 @@ static void flipperham_send_hardcoded_message(FlipperHamApp* app)
         }
     }
 
-    app->repeat_w = false;
     app->done_w = true;
     app->tx_done = true;
     view_port_update(app->view_port);
