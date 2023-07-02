@@ -64,6 +64,8 @@ typedef struct {
 typedef struct
 {
     uint8_t encoding_index;
+    uint8_t rf_m;
+    uint8_t rf_d;
 
     char bulletin[TXT_N][TXT_LEN];
     char status[TXT_N][TXT_LEN];
@@ -89,7 +91,7 @@ void packet_stuff(Packet* p);
 void packet_nrzi(Packet* p);
 
 enum {
-    FlipperHamPresetDefault = 0,
+    FlipperHamPresetDefault = 2,
     FlipperHamModemProfileDefault = 1,
 };
 
@@ -126,8 +128,9 @@ static const uint8_t NAME[] = { \
 };
 
 FLIPPERHAM_ASYNC_PRESET(flipperham_preset_2fsk_dev5_16khz_async_regs, 0x04, 0x83, 0x67, 0x15)
+FLIPPERHAM_ASYNC_PRESET(flipperham_preset_2fsk_dev2_38khz_async_regs, 0x04, 0x83, 0x67, 0x04)
+FLIPPERHAM_ASYNC_PRESET(flipperham_preset_gfsk_dev2_38khz_async_regs, 0x14, 0x83, 0x67, 0x04)
 FLIPPERHAM_ASYNC_PRESET(flipperham_preset_gfsk_dev5_16khz_async_regs, 0x14, 0x83, 0x67, 0x15)
-FLIPPERHAM_ASYNC_PRESET(flipperham_preset_gfsk_dev5_16khz_fast_async_regs, 0x14, 0x93, 0xC8, 0x15)
 
 typedef struct 
 {
@@ -153,6 +156,8 @@ typedef struct
     bool done_w;
     bool send_requested;
     uint8_t encoding_index;
+    uint8_t rf_m;
+    uint8_t rf_d;
     uint8_t repeat_n;
     uint8_t repeat_i;
     Packet* pkt;
@@ -260,9 +265,10 @@ enum
 
 static const FlipperHamPreset flipperham_presets[] = 
 {
-    { "2FSK 5.16", flipperham_preset_2fsk_dev5_16khz_async_regs },
-    { "GFSK 4.8", flipperham_preset_gfsk_dev5_16khz_async_regs },
-    { "GFSK 9.99", flipperham_preset_gfsk_dev5_16khz_fast_async_regs },
+    { "2FSK 2.5", flipperham_preset_2fsk_dev2_38khz_async_regs },
+    { "GFSK 2.5", flipperham_preset_gfsk_dev2_38khz_async_regs },
+    { "2FSK 5.0", flipperham_preset_2fsk_dev5_16khz_async_regs },
+    { "GFSK 5.0", flipperham_preset_gfsk_dev5_16khz_async_regs },
 };
 
 static const FlipperHamModemProfile flipperham_modem_profiles[] =
@@ -372,6 +378,9 @@ static void sc(VariableItem* item);
 static void se(void* context, uint32_t index);
 static void smenu(FlipperHamApp* app);
 static void rc(VariableItem* item);
+static void pc(VariableItem* item);
+static void dc(VariableItem* item);
+static void pf(FlipperHamApp* app);
 
 static uint32_t flipperham_text_exit_callback(void* context) 
 {
@@ -388,6 +397,19 @@ static void ssidfix(FlipperHamApp* app)
 {
     if(app->d_s > 15) app->d_s = 0;
     smenu(app);
+}
+
+static void pf(FlipperHamApp* app)
+{
+    uint8_t a;
+
+    if(app->rf_m > 1) app->rf_m = 0;
+    if(app->rf_d > 1) app->rf_d = 1;
+
+    a = (app->rf_d * 2) + app->rf_m;
+    if(a >= sizeof(flipperham_presets) / sizeof(flipperham_presets[0])) a = FlipperHamPresetDefault;
+
+    flipperham_preset = &flipperham_presets[a];
 }
 
 static void cfgdefs(FlipperHamApp* app)
@@ -409,6 +431,7 @@ static void cfgdefs(FlipperHamApp* app)
     app->calls_n = 0;
 
     app->encoding_index = FlipperHamModemProfileDefault;
+    app->rf_m = 0; app->rf_d = 1;
 
 
     snprintf(app->bulletin[0], sizeof(app->bulletin[0]), "flipper bulletin");
@@ -428,6 +451,8 @@ static void cfgdefs(FlipperHamApp* app)
         app->status_n = 1;
         app->message_n = 1;
         app->calls_n = 2;
+
+    pf(app);
 }
 
 static void cfgsave(FlipperHamApp* app)
@@ -441,6 +466,8 @@ static void cfgsave(FlipperHamApp* app)
     memset(c, 0, sizeof(FlipperHamCfg));
 
     c->encoding_index = app->encoding_index;
+    c->rf_m = app->rf_m;
+    c->rf_d = app->rf_d;
 
     memcpy(c->bulletin, app->bulletin, sizeof(c->bulletin));
     memcpy(c->status, app->status, sizeof(c->status));
@@ -630,6 +657,8 @@ static void cfgload(FlipperHamApp* app)
     }
 
     app->encoding_index = c->encoding_index;
+    app->rf_m = c->rf_m;
+    app->rf_d = c->rf_d;
 
     memcpy(app->bulletin, c->bulletin, sizeof(app->bulletin));
     memcpy(app->status, c->status, sizeof(app->status));
@@ -646,6 +675,8 @@ static void cfgload(FlipperHamApp* app)
 
     if(app->encoding_index >= (sizeof(flipperham_modem_profiles) / sizeof(flipperham_modem_profiles[0])))
         app->encoding_index = FlipperHamModemProfileDefault;
+
+    pf(app);
 
     for(i = 0; i < TXT_N; i++)
     {
@@ -869,6 +900,30 @@ static void bc(VariableItem* item)
     cfgsave(app);
 }
 
+static void pc(VariableItem* item)
+{
+    FlipperHamApp* app = variable_item_get_context(item);
+
+    app->rf_m = variable_item_get_current_value_index(item);
+    if(app->rf_m > 1) app->rf_m = 0;
+
+    variable_item_set_current_value_text(item, app->rf_m ? "GFSK" : "2FSK");
+    pf(app);
+    cfgsave(app);
+}
+
+static void dc(VariableItem* item)
+{
+    FlipperHamApp* app = variable_item_get_context(item);
+
+    app->rf_d = variable_item_get_current_value_index(item);
+    if(app->rf_d > 1) app->rf_d = 1;
+
+    variable_item_set_current_value_text(item, app->rf_d ? "5.0" : "2.5");
+    pf(app);
+    cfgsave(app);
+}
+
 static void rc(VariableItem* item)
 {
     FlipperHamApp* app = variable_item_get_context(item);
@@ -916,6 +971,14 @@ static void rmenu(FlipperHamApp* app)
     it = variable_item_list_add(app->settings_menu, "Baud", sizeof(flipperham_modem_profiles) / sizeof(flipperham_modem_profiles[0]), bc, app);
     variable_item_set_current_value_index(it, app->encoding_index);
     variable_item_set_current_value_text(it, flipperham_modem_profiles[app->encoding_index].name);
+
+    it = variable_item_list_add(app->settings_menu, "CC1101 profile", 2, pc, app);
+    variable_item_set_current_value_index(it, app->rf_m);
+    variable_item_set_current_value_text(it, app->rf_m ? "GFSK" : "2FSK");
+
+    it = variable_item_list_add(app->settings_menu, "Deviation", 2, dc, app);
+    variable_item_set_current_value_index(it, app->rf_d);
+    variable_item_set_current_value_text(it, app->rf_d ? "5.0" : "2.5");
 
     it = variable_item_list_add(app->settings_menu, "Repeat TX", 5, rc, app);
     variable_item_set_current_value_index(it, app->repeat_n - 1);
