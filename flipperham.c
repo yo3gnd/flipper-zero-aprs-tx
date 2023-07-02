@@ -367,6 +367,7 @@ static void bkmenu(FlipperHamApp* app);
 static void c2m(FlipperHamApp* app);
 static void cloadtxt(FlipperHamApp* app);
 static void csavetxt(FlipperHamApp* app);
+static void bc(VariableItem* item);
 static void sc(VariableItem* item);
 static void se(void* context, uint32_t index);
 static void smenu(FlipperHamApp* app);
@@ -856,6 +857,18 @@ static void sc(VariableItem* item)
     variable_item_set_current_value_text(item, a);
 }
 
+static void bc(VariableItem* item)
+{
+    FlipperHamApp* app = variable_item_get_context(item);
+
+    app->encoding_index = variable_item_get_current_value_index(item);
+    if(app->encoding_index >= sizeof(flipperham_modem_profiles) / sizeof(flipperham_modem_profiles[0]))
+        app->encoding_index = FlipperHamModemProfileDefault;
+
+    variable_item_set_current_value_text(item, flipperham_modem_profiles[app->encoding_index].name);
+    cfgsave(app);
+}
+
 static void rc(VariableItem* item)
 {
     FlipperHamApp* app = variable_item_get_context(item);
@@ -900,7 +913,11 @@ static void rmenu(FlipperHamApp* app)
 
     variable_item_list_reset(app->settings_menu);
 
-    it = variable_item_list_add(app->settings_menu, "Repeat TX", 5, rc, app); // just this one for now
+    it = variable_item_list_add(app->settings_menu, "Baud", sizeof(flipperham_modem_profiles) / sizeof(flipperham_modem_profiles[0]), bc, app);
+    variable_item_set_current_value_index(it, app->encoding_index);
+    variable_item_set_current_value_text(it, flipperham_modem_profiles[app->encoding_index].name);
+
+    it = variable_item_list_add(app->settings_menu, "Repeat TX", 5, rc, app);
     variable_item_set_current_value_index(it, app->repeat_n - 1);
     snprintf(a, sizeof(a), "%u", app->repeat_n);
     variable_item_set_current_value_text(it, a);
@@ -1595,20 +1612,28 @@ static bool wave_add(FlipperHamApp* app, uint16_t value)
 
 static bool wave_put(FlipperHamApp* app, uint8_t bit)
 {
+    const FlipperHamModemProfile* p;
+    uint32_t b;
+    uint32_t h;
+    uint32_t r;
+
+    p = &flipperham_modem_profiles[app->encoding_index];
+    b = (33000000UL + (p->baud / 2)) / p->baud;
+
     if(bit == 0) app->wave_is_mark = !app->wave_is_mark;
 
-    if(app->wave_is_mark)
+    if(app->wave_is_mark) h = (16500000UL + (p->mark_hz / 2)) / p->mark_hz;
+    else h = (16500000UL + (p->space_hz / 2)) / p->space_hz;
+
+    r = b;
+
+    while(r > h)
     {
-        if(!wave_add(app, 13750)) return false;
-        if(!wave_add(app, 13750)) return false;
+        if(!wave_add(app, h)) return false;
+        r -= h;
     }
-    else
-    {
-        if(!wave_add(app, 7500)) return false;
-        if(!wave_add(app, 7500)) return false;
-        if(!wave_add(app, 7500)) return false;
-        if(!wave_add(app, 5000)) return false;
-    }
+
+    if(r) if(!wave_add(app, r)) return false;
 
     return true;
 }
@@ -1632,7 +1657,9 @@ static void txstart(FlipperHamApp* app)
     char bulletin_id;
     char dst[CALL_LEN];
     char dst_full[CALL_LEN];
+    const FlipperHamModemProfile* p;
     uint16_t i;
+    uint16_t n;
     uint8_t j;
     uint8_t ssid;
     bool has_ssid;
@@ -1647,6 +1674,8 @@ static void txstart(FlipperHamApp* app)
     if(!app->pkt) return;
     if(!app->wave) return;
     if(app->tx_msg_index >= TXT_N) return;
+
+    p = &flipperham_modem_profiles[app->encoding_index];
 
     /* bulletin message */
     if(app->tx_t == 0)
@@ -1703,7 +1732,9 @@ static void txstart(FlipperHamApp* app)
     packet_nrzi(app->pkt);
 
     /* 50 ms mark */
-    for(i = 0; i < 60 && wave_put(app, 1); i++);
+    n = (50 * p->baud + 500) / 1000;
+    if(!n) n = 1;
+    for(i = 0; i < n && wave_put(app, 1); i++);
 
     /* preamble */
     for(i = 0; i < 50; i++)
