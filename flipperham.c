@@ -1,4 +1,5 @@
 #include "flipperham.h"
+#include "packet.h"
 
 static void bx0(void* context, uint32_t index);
 static void sx0(void* context, uint32_t index);
@@ -19,47 +20,6 @@ static void mx0(void* context, uint32_t index);
 
 #include <stdio.h>
 #include <string.h>
-
-#define CARRIER_HZ    433250000UL
-#define MY_CALL       "FL1PER"
-#define MY_TOCALL     "APZFLP"
-#define TXT_N         16
-#define CALL_N        32
-#define TXT_LEN       68
-#define CALL_LEN      10
-#define CFG_DIR       "/ext/apps_data/aprstx"
-#define CFG_FILE      "/ext/apps_data/aprstx/cfg.bin"
-#define CALLBOOK_DIR  "/ham"
-#define CALLBOOK_FILE "/ham/callbook.txt"
-
-typedef struct {
-    const char* name;
-    const uint8_t* regs;
-} FlipperHamPreset;
-
-typedef struct {
-    const char* name;
-    uint16_t baud;
-    uint16_t mark_hz;
-    uint16_t space_hz;
-} FlipperHamModemProfile;
-
-typedef struct {
-    uint8_t payload[96];
-    uint16_t payload_len;
-
-    uint8_t ax25[192];
-    uint16_t ax25_len;
-
-    uint8_t fcs[194];
-    uint16_t fcs_len;
-
-    uint8_t stuffed[1800];
-    uint16_t stuffed_len;
-
-    uint8_t nrzi[1800];
-    uint16_t nrzi_len;
-} Packet;
 
 typedef struct
 {
@@ -82,18 +42,6 @@ typedef struct
     uint8_t message_n;
     uint8_t calls_n;
 } FlipperHamCfg;
-
-void packet_do_all(Packet* p, const char* from, uint8_t from_ssid, const char* to, uint8_t to_ssid, const char* s);
-void packet_init(Packet* p);
-void packet_make_ax25(Packet* p, const char* from, uint8_t from_ssid, const char* to, uint8_t to_ssid);
-void packet_add_fcs(Packet* p);
-void packet_stuff(Packet* p);
-void packet_nrzi(Packet* p);
-
-enum {
-    FlipperHamPresetDefault = 2,
-    FlipperHamModemProfileDefault = 1,
-};
 
 #define FLIPPERHAM_ASYNC_PRESET(NAME, MOD, DRATE3, DRATE4, DEV) \
 static const uint8_t NAME[] = { \

@@ -1,22 +1,6 @@
-#include <stdint.h>
+#include "packet.h"
+
 #include <string.h>
-
-typedef struct {
-    uint8_t payload[96];
-    uint16_t payload_len;
-
-    uint8_t ax25[192];
-    uint16_t ax25_len;
-
-    uint8_t fcs[194];
-    uint16_t fcs_len;
-
-    uint8_t stuffed[1800];
-    uint16_t stuffed_len;
-
-    uint8_t nrzi[1800];
-    uint16_t nrzi_len;
-} Packet;
 
 static void packet_addr(uint8_t* out, const char* call, uint8_t ssid, uint8_t last)
 {
