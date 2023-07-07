@@ -21,28 +21,6 @@ static void mx0(void* context, uint32_t index);
 #include <stdio.h>
 #include <string.h>
 
-typedef struct
-{
-    uint8_t encoding_index;
-    uint8_t rf_m;
-    uint8_t rf_d;
-
-    char bulletin[TXT_N][TXT_LEN];
-    char status[TXT_N][TXT_LEN];
-    char message[TXT_N][TXT_LEN];
-    char calls[CALL_N][CALL_LEN];
-
-    uint8_t bulletin_used[TXT_N];
-    uint8_t status_used[TXT_N];
-    uint8_t message_used[TXT_N];
-    uint8_t calls_used[CALL_N];
-
-    uint8_t bulletin_n;
-    uint8_t status_n;
-    uint8_t message_n;
-    uint8_t calls_n;
-} FlipperHamCfg;
-
 #define FLIPPERHAM_ASYNC_PRESET(NAME, MOD, DRATE3, DRATE4, DEV) \
 static const uint8_t NAME[] = { \
     CC1101_IOCFG0, 0x0D, \
@@ -145,73 +123,7 @@ typedef struct
     char c2_h[24];
 } FlipperHamApp;
 
-enum 
-{
-    FlipperHamViewMenu = 0,
-    FlipperHamViewSend,
-    FlipperHamViewSettings,
-    FlipperHamViewBulletin,
-    FlipperHamViewStatus,
-    FlipperHamViewMessage,
-    FlipperHamViewSsid,
-    FlipperHamViewCall,
-    FlipperHamViewBook,
-    FlipperHamViewC2,
-    FlipperHamViewTextInput,
-};
-
-enum 
-{
-    FlipperHamMenuIndexSend = 0,
-    FlipperHamMenuIndexSettings,
-    FlipperHamMenuIndexCallbook,
-};
-
-enum
-{
-    FlipperHamSendIndexMessage = 0,
-    FlipperHamSendIndexStatus,
-    FlipperHamSendIndexBulletin,
-};
-
-enum
-{
-    FlipperHamBulletinIndexAdd = 0,
-    FlipperHamBulletinIndexBase = 100,
-};
-
-enum
-{
-    FlipperHamStatusIndexAdd = 0,
-    FlipperHamStatusIndexBase = 200,
-};
-
-enum
-{
-    FlipperHamCallIndexAdd = 0,
-    FlipperHamCallIndexBase = 300,
-};
-
-enum
-{
-    FlipperHamMessageIndexAdd = 0,
-    FlipperHamMessageIndexBase = 400,
-};
-
-enum
-{
-    FlipperHamBookIndexAdd = 0,
-    FlipperHamBookIndexBase = 500,
-};
-
-enum
-{
-    FlipperHamC2IndexEdit = 0,
-    FlipperHamC2IndexDelete,
-    FlipperHamC2IndexCopy,
-};
-
-static const FlipperHamPreset flipperham_presets[] = 
+const FlipperHamPreset flipperham_presets[] = 
 {
     { "2FSK 2.5", flipperham_preset_2fsk_dev2_38khz_async_regs },
     { "GFSK 2.5", flipperham_preset_gfsk_dev2_38khz_async_regs },
@@ -219,7 +131,7 @@ static const FlipperHamPreset flipperham_presets[] =
     { "GFSK 5.0", flipperham_preset_gfsk_dev5_16khz_async_regs },
 };
 
-static const FlipperHamModemProfile flipperham_modem_profiles[] =
+const FlipperHamModemProfile flipperham_modem_profiles[] =
 {
     { "300bd", 300, 1600, 1800 },
     { "1200bd", 1200, 1200, 2200 },
