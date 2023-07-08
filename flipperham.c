@@ -1,5 +1,7 @@
 #include "flipperham.h"
 #include "packet.h"
+#include "app_state.h"
+#include "rf_gen.h"
 
 static void bx0(void* context, uint32_t index);
 static void sx0(void* context, uint32_t index);
@@ -20,124 +22,6 @@ static void mx0(void* context, uint32_t index);
 
 #include <stdio.h>
 #include <string.h>
-
-#define FLIPPERHAM_ASYNC_PRESET(NAME, MOD, DRATE3, DRATE4, DEV) \
-static const uint8_t NAME[] = { \
-    CC1101_IOCFG0, 0x0D, \
-    CC1101_FSCTRL1, 0x06, \
-    CC1101_PKTCTRL0, 0x32, \
-    CC1101_PKTCTRL1, 0x04, \
-    CC1101_MDMCFG0, 0x00, \
-    CC1101_MDMCFG1, 0x02, \
-    CC1101_MDMCFG2, MOD, \
-    CC1101_MDMCFG3, DRATE3, \
-    CC1101_MDMCFG4, DRATE4, \
-    CC1101_DEVIATN, DEV, \
-    CC1101_MCSM0, 0x18, \
-    CC1101_FOCCFG, 0x16, \
-    CC1101_AGCCTRL0, 0x91, \
-    CC1101_AGCCTRL1, 0x00, \
-    CC1101_AGCCTRL2, 0x07, \
-    CC1101_WORCTRL, 0xFB, \
-    CC1101_FREND0, 0x10, \
-    CC1101_FREND1, 0x56, \
-    0, \
-    0, \
-    0xC0, \
-    0x00, \
-    0x00, \
-    0x00, \
-    0x00, \
-    0x00, \
-    0x00, \
-    0x00, \
-};
-
-FLIPPERHAM_ASYNC_PRESET(flipperham_preset_2fsk_dev5_16khz_async_regs, 0x04, 0x83, 0x67, 0x15)
-FLIPPERHAM_ASYNC_PRESET(flipperham_preset_2fsk_dev2_38khz_async_regs, 0x04, 0x83, 0x67, 0x04)
-FLIPPERHAM_ASYNC_PRESET(flipperham_preset_gfsk_dev2_38khz_async_regs, 0x14, 0x83, 0x67, 0x04)
-FLIPPERHAM_ASYNC_PRESET(flipperham_preset_gfsk_dev5_16khz_async_regs, 0x14, 0x83, 0x67, 0x15)
-
-typedef struct 
-{
-    Gui* gui;
-    ViewDispatcher* view_dispatcher;
-    Submenu* submenu;
-    Submenu* send_menu;
-    Submenu* bulletin_menu;
-    Submenu* status_menu;
-    Submenu* message_menu;
-    Submenu* call_menu;
-    Submenu* book_menu;
-    Submenu* c2_menu;
-    VariableItemList* settings_menu;
-    VariableItemList* ssid_menu;
-    TextInput* text_input;
-    ViewPort* view_port;
-    volatile uint16_t wave_i;
-    volatile bool level;
-    volatile bool tx_started;
-    volatile bool tx_done;
-    volatile bool tx_allowed;
-    bool done_w;
-    bool send_requested;
-    uint8_t encoding_index;
-    uint8_t rf_m;
-    uint8_t rf_d;
-    uint8_t repeat_n;
-    uint8_t repeat_i;
-    Packet* pkt;
-    uint16_t* wave;
-    uint16_t wave_len;
-    int16_t wave_carry;
-    bool wave_is_mark;
-    uint32_t repeat_t0;
-    uint32_t repeat_to;
-    uint8_t go_v;
-    char bulletin[TXT_N][TXT_LEN];
-    char status[TXT_N][TXT_LEN];
-    char message[TXT_N][TXT_LEN];
-    char calls[CALL_N][CALL_LEN];
-    uint8_t bulletin_used[TXT_N];
-    uint8_t status_used[TXT_N];
-    uint8_t message_used[TXT_N];
-    uint8_t calls_used[CALL_N];
-    uint8_t bulletin_n;
-    uint8_t status_n;
-    uint8_t message_n;
-    uint8_t calls_n;
-    uint8_t tx_msg_index;
-    uint8_t tx_t;
-    uint8_t bulletin_index;
-    uint8_t status_index;
-    uint8_t message_index;
-      uint8_t dst_call_index;  // dest
-    uint8_t d_s;
-    uint8_t edit_call_index;
-    uint8_t book_call_index;
-    uint8_t txt;
-    char b_edit[TXT_LEN];
-    char st_edit[TXT_LEN];
-    char m_edit[TXT_LEN];
-    char c_edit[CALL_LEN];
-    char c2_h[24];
-} FlipperHamApp;
-
-const FlipperHamPreset flipperham_presets[] = 
-{
-    { "2FSK 2.5", flipperham_preset_2fsk_dev2_38khz_async_regs },
-    { "GFSK 2.5", flipperham_preset_gfsk_dev2_38khz_async_regs },
-    { "2FSK 5.0", flipperham_preset_2fsk_dev5_16khz_async_regs },
-    { "GFSK 5.0", flipperham_preset_gfsk_dev5_16khz_async_regs },
-};
-
-const FlipperHamModemProfile flipperham_modem_profiles[] =
-{
-    { "300bd", 300, 1600, 1800 },
-    { "1200bd", 1200, 1200, 2200 },
-};
-
-static const FlipperHamPreset* flipperham_preset = &flipperham_presets[FlipperHamPresetDefault];
 
 static uint32_t flipperham_exit_callback(void* context) 
 {
@@ -224,7 +108,7 @@ static void stsave(void* context);
 static void msave(void* context);
 static void csave(void* context);
 static bool cval(char* s);
-static bool csplit(const char* s, char* out, uint8_t* ssid, bool* has_ssid);
+bool csplit(const char* s, char* out, uint8_t* ssid, bool* has_ssid);
 static void bfix(FlipperHamApp* app);
 static void stfix(FlipperHamApp* app);
 static void mfix(FlipperHamApp* app);
@@ -240,7 +124,6 @@ static void smenu(FlipperHamApp* app);
 static void rc(VariableItem* item);
 static void pc(VariableItem* item);
 static void dc(VariableItem* item);
-static void pf(FlipperHamApp* app);
 
 static uint32_t flipperham_text_exit_callback(void* context) 
 {
@@ -257,19 +140,6 @@ static void ssidfix(FlipperHamApp* app)
 {
     if(app->d_s > 15) app->d_s = 0;
     smenu(app);
-}
-
-static void pf(FlipperHamApp* app)
-{
-    uint8_t a;
-
-    if(app->rf_m > 1) app->rf_m = 0;
-    if(app->rf_d > 1) app->rf_d = 1;
-
-    a = (app->rf_d * 2) + app->rf_m;
-    if(a >= sizeof(flipperham_presets) / sizeof(flipperham_presets[0])) a = FlipperHamPresetDefault;
-
-    flipperham_preset = &flipperham_presets[a];
 }
 
 static void cfgdefs(FlipperHamApp* app)
@@ -1354,7 +1224,7 @@ static void c2(void* context, uint32_t index)
     view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewC2);
 }
 
-static bool csplit(const char* s, char* out, uint8_t* ssid, bool* has_ssid)
+bool csplit(const char* s, char* out, uint8_t* ssid, bool* has_ssid)
 {
     char a[CALL_LEN];
     uint8_t i;
@@ -1515,222 +1385,6 @@ static void flipperham_draw_callback(Canvas* canvas, void* context)
         w = (n * 80UL) / m;
         if(w) canvas_draw_box(canvas, 24, 32, w, 3);
     }
-}
-
-static bool wave_add(FlipperHamApp* app, uint16_t value)
-{
-    int32_t acc;
-
-    if(!app->wave) return false;
-    if(app->wave_len >= 4096) return false;
-
-    acc = value + app->wave_carry;
-    value = (acc + 16) / 33;
-    app->wave_carry = acc - ((int32_t)value * 33);
-    if(!value) return true;
-
-    app->wave[app->wave_len++] = value;
-    return true;
-}
-
-static bool wave_put(FlipperHamApp* app, uint8_t bit)
-{
-    const FlipperHamModemProfile* p;
-    uint32_t b;
-    uint32_t h;
-    uint32_t r;
-
-    p = &flipperham_modem_profiles[app->encoding_index];
-    b = (33000000UL + (p->baud / 2)) / p->baud;
-
-    if(bit == 0) app->wave_is_mark = !app->wave_is_mark;
-
-    if(app->wave_is_mark) h = (16500000UL + (p->mark_hz / 2)) / p->mark_hz;
-    else h = (16500000UL + (p->space_hz / 2)) / p->space_hz;
-
-    r = b;
-
-    while(r > h)
-    {
-        if(!wave_add(app, h)) return false;
-        r -= h;
-    }
-
-    if(r) if(!wave_add(app, r)) return false;
-
-    return true;
-}
-
-static bool wave_flag(FlipperHamApp* app)
-{
-    static const uint8_t flag[] = {0, 1, 1, 1, 1, 1, 1, 0};
-    uint8_t i;
-
-    for(i = 0; i < sizeof(flag); i++)
-    {
-        if(!wave_put(app, flag[i])) return false;
-    }
-
-    return true;
-}
-
-static void txstart(FlipperHamApp* app)
-{
-    char message[96];
-    char bulletin_id;
-    char dst[CALL_LEN];
-    char dst_full[CALL_LEN];
-    const FlipperHamModemProfile* p;
-    uint16_t i;
-    uint16_t n;
-    uint8_t j;
-    uint8_t ssid;
-    bool has_ssid;
-
-    app->tx_done = false;
-    app->wave_i = 0;
-    app->level = true;
-    app->wave_len = 0;
-    app->wave_carry = 0;
-    app->wave_is_mark = true;
-
-    if(!app->pkt) return;
-    if(!app->wave) return;
-    if(app->tx_msg_index >= TXT_N) return;
-
-    p = &flipperham_modem_profiles[app->encoding_index];
-
-    /* bulletin message */
-    if(app->tx_t == 0)
-    {
-        if(!app->bulletin_used[app->tx_msg_index]) return;
-        if(!app->bulletin[app->tx_msg_index][0]) return;
-
-        bulletin_id = '0';
-        if(app->tx_msg_index < 10) bulletin_id = '0' + app->tx_msg_index;
-        else if(app->tx_msg_index < 16) bulletin_id = 'A' + (app->tx_msg_index - 10);
-
-        snprintf(message, sizeof(message), ":BLN%c     :%s", bulletin_id, app->bulletin[app->tx_msg_index]);
-    }
-    /* status message */
-    else if(app->tx_t == 1)
-    {
-        if(!app->status_used[app->tx_msg_index]) return;
-        if(!app->status[app->tx_msg_index][0]) return;
-
-        snprintf(message, sizeof(message), ">%s", app->status[app->tx_msg_index]);
-    }
-    /* APRS direct */
-    else
-    {
-        if(app->dst_call_index >= CALL_N) return;
-        if(!app->message_used[app->tx_msg_index]) return;
-        if(!app->message[app->tx_msg_index][0]) return;
-        if(!app->calls_used[app->dst_call_index]) return;
-        if(!app->calls[app->dst_call_index][0]) return;
-
-        if(!csplit(app->calls[app->dst_call_index], dst, &ssid, &has_ssid)) return;
-        if(!has_ssid) ssid = app->d_s;
-
-        j = 0;
-        while(dst[j])
-        {
-            dst_full[j] = dst[j];
-            j++;
-        }
-        dst_full[j++] = '-';
-        if(ssid >= 10) dst_full[j++] = '0' + (ssid / 10);
-        dst_full[j++] = '0' + (ssid % 10);
-        dst_full[j] = 0;
-
-        snprintf(message, sizeof(message), ":%-9s:%s", dst_full, app->message[app->tx_msg_index]);
-    }
-
-    packet_init(app->pkt);
-    snprintf((char*)app->pkt->payload, sizeof(app->pkt->payload), "%s", message);
-    app->pkt->payload_len = strlen((char*)app->pkt->payload);
-    packet_make_ax25(app->pkt, MY_CALL, 0, MY_TOCALL, 0);
-    packet_add_fcs(app->pkt);
-    packet_stuff(app->pkt);
-    packet_nrzi(app->pkt);
-
-    /* 50 ms mark */
-    n = (50 * p->baud + 500) / 1000;
-    if(!n) n = 1;
-    for(i = 0; i < n && wave_put(app, 1); i++);
-
-    /* preamble */
-    for(i = 0; i < 50; i++)
-    {
-        if(!wave_flag(app)) break;
-    }
-
-    /* skip the flag at head and tail, add our own */
-    for(i = 8; i + 8 < app->pkt->stuffed_len; i++)
-    {
-        if(!wave_put(app, app->pkt->stuffed[i])) break;
-    }
-
-    /* post */
-    for(i = 0; i < 3; i++)
-    {
-        if(!wave_flag(app)) break;
-    }
-
-    if(!app->wave_len) app->tx_done = true;
-}
-
-static LevelDuration edge_yield(void* context) 
-{
-    FlipperHamApp* app = context;
-    LevelDuration ld;
-    uint16_t half_us;
-
-    if(app->tx_done) return level_duration_reset();
-
-    if(app->wave_i >= app->wave_len)
-    {
-        app->tx_done = true;
-        return level_duration_reset();
-    }
-
-    half_us = app->wave[app->wave_i];
-
-    ld = level_duration_make(app->level, half_us);
-
-    app->level = !app->level;
-    app->wave_i++;
-
-    if(app->wave_i >= app->wave_len) app->tx_done = true;
-
-    return ld;
-}
-
-static void flipperham_radio_start(FlipperHamApp* app) 
-{
-    furi_hal_subghz_reset();
-    furi_hal_subghz_idle();
-    furi_hal_subghz_load_custom_preset((uint8_t*)flipperham_preset->regs);
-    furi_hal_subghz_set_frequency_and_path(CARRIER_HZ);
-    furi_hal_subghz_flush_tx();
-
-    if(!furi_hal_subghz_tx()) {
-        app->tx_allowed = false;
-        app->tx_done = true;
-        return;
-    }
-
-    app->tx_allowed = furi_hal_subghz_start_async_tx(edge_yield, app);
-    app->tx_started = app->tx_allowed;
-    if(!app->tx_allowed) app->tx_done = true;
-}
-
-static void flipperham_radio_stop(FlipperHamApp* app) 
-{
-    if(app->tx_started) 
-        furi_hal_subghz_stop_async_tx();
-
-    furi_hal_subghz_sleep();
 }
 
 static FlipperHamApp* flipperham_app_alloc(void) {
