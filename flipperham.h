@@ -17,27 +17,6 @@
 #define CALLBOOK_DIR  "/ham"
 #define CALL_LEN      10
 
-
-typedef struct {
-    const char* name;
-    uint16_t baud;
-    uint16_t mark_hz;
-    uint16_t space_hz;
-} FlipperHamModemProfile;
-
-
-enum {
-    FlipperHamModemProfileDefault = 1,
-    FlipperHamPresetDefault = 2,
-};
-
-
-typedef struct {
-    const char* name;
-    const uint8_t* regs;
-} FlipperHamPreset;
-
-
 typedef struct
 {
     uint8_t encoding_index;
@@ -134,9 +113,5 @@ enum
     FlipperHamC2IndexDelete,
     FlipperHamC2IndexCopy,
 };
-
-
-extern const FlipperHamPreset flipperham_presets[];
-extern const FlipperHamModemProfile flipperham_modem_profiles[];
 
 int32_t flipperham_app(void* p);

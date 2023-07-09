@@ -5,6 +5,26 @@
 #include "app_state.h"
 
 
+typedef struct {
+    const char* name;
+    const uint8_t* regs;
+} FlipperHamPreset;
+
+
+enum {
+    FlipperHamModemProfileDefault = 1,
+    FlipperHamPresetDefault = 2,
+};
+
+
+typedef struct {
+    const char* name;
+    uint16_t baud;
+    uint16_t mark_hz;
+    uint16_t space_hz;
+} FlipperHamModemProfile;
+
+
 extern const FlipperHamPreset flipperham_presets[4];
 extern const FlipperHamModemProfile flipperham_modem_profiles[2];
 
