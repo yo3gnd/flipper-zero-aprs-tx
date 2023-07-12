@@ -90,6 +90,16 @@ void pf(FlipperHamApp* app)
     flipperham_preset = &flipperham_presets[a];
 }
 
+uint32_t txf(FlipperHamApp* app)
+{
+    if(app->tx_freq_index < FREQ_N)
+        if(app->freq_used[app->tx_freq_index])
+            if(app->freq[app->tx_freq_index])
+                return app->freq[app->tx_freq_index];
+
+    return CARRIER_HZ;
+}
+
 
 static bool wave_add(FlipperHamApp* app, uint16_t value)
 {
@@ -286,7 +296,7 @@ void flipperham_radio_start(FlipperHamApp* app)
     furi_hal_subghz_reset();
     furi_hal_subghz_idle();
     furi_hal_subghz_load_custom_preset((uint8_t*)flipperham_preset->regs);
-    furi_hal_subghz_set_frequency_and_path(CARRIER_HZ);
+    furi_hal_subghz_set_frequency_and_path(txf(app));
     furi_hal_subghz_flush_tx();
 
     if(!furi_hal_subghz_tx()) {

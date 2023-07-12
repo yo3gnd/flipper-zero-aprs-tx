@@ -5,11 +5,13 @@
 static void bx0(void* context, uint32_t index);
 static void sx0(void* context, uint32_t index);
 static void cx0(void* context, uint32_t index);
+static void fq0(void* context, uint32_t index);
 static void mx0(void* context, uint32_t index);
 #include <furi_hal.h>
 #include <gui/view.h>
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 static uint32_t flipperham_exit_callback(void* context);
@@ -20,6 +22,8 @@ static uint32_t flipperham_status_exit_callback(void* context);
 static uint32_t flipperham_message_exit_callback(void* context);
 static uint32_t flipperham_ssid_exit_callback(void* context);
 static uint32_t flipperham_call_exit_callback(void* context);
+static uint32_t flipperham_freq_exit_callback(void* context);
+static uint32_t flipperham_freq_edit_exit_callback(void* context);
 static uint32_t bookx(void* context);
 static uint32_t c2x(void* context);
 static uint32_t flipperham_text_exit_callback(void* context);
@@ -35,10 +39,12 @@ static void cx(void* context, InputType input_type, uint32_t index);
 static void cl(void* context, uint32_t index);
 static void cb(void* context, uint32_t index);
 static void c2(void* context, uint32_t index);
+static void fq(void* context, InputType input_type, uint32_t index);
 static void bsave(void* context);
 static void stsave(void* context);
 static void msave(void* context);
 static void csave(void* context);
+static void fsave(void* context);
 
 
 static void bmenu(FlipperHamApp* app);
@@ -49,13 +55,19 @@ static void bkmenu(FlipperHamApp* app);
 static void c2m(FlipperHamApp* app);
 static void smenu(FlipperHamApp* app);
 static void rmenu(FlipperHamApp* app);
+static void fmenu(FlipperHamApp* app);
+static void femenu(FlipperHamApp* app);
 static void ssidfix(FlipperHamApp* app);
 static void sc(VariableItem* item);
 static void bc(VariableItem* item);
 static void pc(VariableItem* item);
 static void dc(VariableItem* item);
 static void rc(VariableItem* item);
+static void fc(VariableItem* item);
 static void se(void* context, uint32_t index);
+static void re(void* context, uint32_t index);
+static void fe(void* context, uint32_t index);
+static uint32_t fstep(uint32_t a, int8_t d);
 
 
 static void flipperham_draw_callback(Canvas* canvas, void* context);
@@ -78,6 +90,9 @@ static void flipperham_draw_callback(Canvas* canvas, void* context)
     uint32_t n, w, m;
 
     canvas_clear(canvas);
+    canvas_set_font(canvas, FontBigNumbers);
+    snprintf(a, sizeof(a), "%06lu", (unsigned long)(txf(app) / 1000UL));
+    canvas_draw_str_aligned(canvas, 64, 11, AlignCenter, AlignCenter, a);
     canvas_set_font(canvas, FontPrimary);
 
     if(!app->tx_allowed) 
@@ -236,6 +251,20 @@ static uint32_t flipperham_call_exit_callback(void* context)
     return FlipperHamViewSend;
 }
 
+static uint32_t flipperham_freq_exit_callback(void* context)
+{
+    UNUSED(context);
+
+    return FlipperHamViewSettings;
+}
+
+static uint32_t flipperham_freq_edit_exit_callback(void* context)
+{
+    UNUSED(context);
+
+    return FlipperHamViewFreq;
+}
+
 static uint32_t bookx(void* context)
 {
     UNUSED(context);
@@ -254,6 +283,7 @@ static uint32_t flipperham_text_exit_callback(void* context)
 {
     FlipperHamApp* app = context;
 
+    if(app->txt == 5) return FlipperHamViewFreqEdit;
     if(app->txt == 3) return FlipperHamViewMessage;
     if(app->txt == 4) return FlipperHamViewBook;
     if(app->txt == 2) return FlipperHamViewCall;
@@ -362,6 +392,72 @@ static void c2m(FlipperHamApp* app)
     submenu_add_item( app->c2_menu, "Copy", FlipperHamC2IndexCopy, c2, app);
 }
 
+static uint32_t fstep(uint32_t a, int8_t d)
+{
+    uint16_t i;
+    uint32_t b;
+
+    b = a;
+
+    for(i = 0; i < 240; i++)
+    {
+        if(d > 0)
+        {
+            if(b > 999999999UL - 2500UL) break;
+            b += 2500UL;
+        }
+        else
+        {
+            if(b < 2500UL) break;
+            b -= 2500UL;
+        }
+
+        if(furi_hal_subghz_is_frequency_valid(b)) return b;
+    }
+
+    return a;
+}
+
+static void fmenu(FlipperHamApp* app)
+{
+    uint8_t i;
+
+    submenu_reset(app->freq_menu);
+
+    if(app->freq_n < FREQ_N)
+        submenu_add_item(app->freq_menu, "Add new...", FlipperHamFreqIndexAdd, fq0, app);
+
+    for(i = 0; i < FREQ_N; i++)
+    {
+        if(!app->freq_used[i]) continue;
+        if(app->tx_freq_index == i) snprintf(app->freq_s[i], sizeof(app->freq_s[i]), "%lu    *", (unsigned long)app->freq[i]);
+        else snprintf(app->freq_s[i], sizeof(app->freq_s[i]), "%lu", (unsigned long)app->freq[i]);
+        submenu_add_item(app->freq_menu, app->freq_s[i], FlipperHamFreqIndexBase + i, fq0, app);
+    }
+}
+
+static void femenu(FlipperHamApp* app)
+{
+    VariableItem* it;
+
+    variable_item_list_reset(app->freq_edit_menu);
+
+    it = variable_item_list_add(app->freq_edit_menu, "Frequency", 201, fc, app);
+    variable_item_set_current_value_index(it, 100);
+    snprintf(app->f_edit, sizeof(app->f_edit), "%lu", (unsigned long)app->freq_edit_hz);
+    variable_item_set_current_value_text(it, app->f_edit);
+
+    variable_item_list_add(app->freq_edit_menu, "Enter frequency", 1, NULL, NULL);
+
+    if(app->freq_n > 1)
+        if(app->freq_index < FREQ_N)
+            if(app->freq_used[app->freq_index])
+                variable_item_list_add(app->freq_edit_menu, "Delete", 1, NULL, NULL);
+
+    variable_item_list_add(app->freq_edit_menu, "Select for TX", 1, NULL, NULL);
+    variable_item_list_set_selected_item(app->freq_edit_menu, 0);
+}
+
 static void smenu(FlipperHamApp* app)
 {
     VariableItem* it;
@@ -382,9 +478,14 @@ static void smenu(FlipperHamApp* app)
 static void rmenu(FlipperHamApp* app)
 {
     VariableItem* it;
-    char a[4];
+    char a[16];
 
     variable_item_list_reset(app->settings_menu);
+
+    it = variable_item_list_add(app->settings_menu, "Frequen cy", 1, NULL, NULL);
+    snprintf(a, sizeof(a), "%06lu", (unsigned long)(txf(app) / 1000UL));
+    variable_item_set_current_value_index(it, 0);
+    variable_item_set_current_value_text(it, a);
 
     it = variable_item_list_add(app->settings_menu, "Baud", sizeof(flipperham_modem_profiles) / sizeof(flipperham_modem_profiles[0]), bc, app);
     variable_item_set_current_value_index(it, app->encoding_index);
@@ -485,6 +586,30 @@ static void rc(VariableItem* item)
     variable_item_set_current_value_text(item, a);
 }
 
+static void fc(VariableItem* item)
+{
+    FlipperHamApp* app = variable_item_get_context(item);
+    uint8_t i;
+
+    i = variable_item_get_current_value_index(item);
+
+    while(i > 100)
+    {
+        app->freq_edit_hz = fstep(app->freq_edit_hz, 1);
+        i--;
+    }
+
+    while(i < 100)
+    {
+        app->freq_edit_hz = fstep(app->freq_edit_hz, -1);
+        i++;
+    }
+
+    snprintf(app->f_edit, sizeof(app->f_edit), "%lu", (unsigned long)app->freq_edit_hz);
+    variable_item_set_current_value_text(item, app->f_edit);
+    variable_item_set_current_value_index(item, 100);
+}
+
 static void se(void* context, uint32_t index)
 {
     FlipperHamApp* app = context;
@@ -494,6 +619,124 @@ static void se(void* context, uint32_t index)
     app->go_v = FlipperHamViewMessage;
     app->send_requested = true;
     view_dispatcher_stop(app->view_dispatcher);
+}
+
+static void re(void* context, uint32_t index)
+{
+    FlipperHamApp* app = context;
+
+    if(index != FlipperHamSettingsIndexFreq) return;
+
+    fmenu(app);
+    view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewFreq);
+}
+
+static void fe(void* context, uint32_t index)
+{
+    FlipperHamApp* app = context;
+    bool d;
+
+    d = false;
+    if(app->freq_n > 1)
+        if(app->freq_index < FREQ_N)
+            if(app->freq_used[app->freq_index])
+                d = true;
+
+    if(index == 1)
+    {
+        snprintf(app->f_edit, sizeof(app->f_edit), "%lu", (unsigned long)app->freq_edit_hz);
+        app->txt = 5;
+        text_input_reset(app->text_input);
+        text_input_set_header_text(app->text_input, "Frequency");
+        text_input_set_result_callback(app->text_input, fsave, app, app->f_edit, sizeof(app->f_edit), true);
+        view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewTextInput);
+        return;
+    }
+
+    if(d && index == 2)
+    {
+        app->freq[app->freq_index] = 0;
+        app->freq_used[app->freq_index] = 0;
+        ffix(app);
+        cfgsave(app);
+        fmenu(app);
+        rmenu(app);
+        view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewFreq);
+        return;
+    }
+
+    if((d && index == 3) || (!d && index == 2))
+    {
+        if(app->freq_index >= FREQ_N) return;
+        if(!furi_hal_subghz_is_frequency_valid(app->freq_edit_hz)) return;
+
+        app->freq[app->freq_index] = app->freq_edit_hz;
+        app->freq_used[app->freq_index] = 1;
+        app->tx_freq_index = app->freq_index;
+        ffix(app);
+        cfgsave(app);
+        fmenu(app);
+        submenu_set_selected_item(app->freq_menu, FlipperHamFreqIndexBase + app->freq_index);
+        rmenu(app);
+        view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewFreq);
+    }
+}
+
+static void fq(void* context, InputType input_type, uint32_t index)
+{
+    FlipperHamApp* app = context;
+    uint8_t i;
+
+    if(index == FlipperHamFreqIndexAdd)
+    {
+        app->freq_index = 0xff;
+
+        for(i = 0; i < FREQ_N; i++)
+            if(!app->freq_used[i]) {
+                app->freq_index = i;
+                break;
+            }
+
+        if(app->freq_index == 0xff) return;
+
+        app->freq_edit_hz = txf(app);
+        femenu(app);
+        view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewFreqEdit);
+        return;
+    }
+
+    i = index - FlipperHamFreqIndexBase;
+    if(i >= FREQ_N) return;
+    if(!app->freq_used[i]) return;
+
+    if(input_type == InputTypeLong)
+    {
+        app->tx_freq_index = i;
+        cfgsave(app);
+        fmenu(app);
+        rmenu(app);
+        submenu_set_selected_item(app->freq_menu, FlipperHamFreqIndexBase + i);
+        return;
+    }
+
+    if(input_type != InputTypeShort) return;
+
+    app->freq_index = i;
+    app->freq_edit_hz = app->freq[i];
+    femenu(app);
+    view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewFreqEdit);
+}
+
+static void fsave(void* context)
+{
+    FlipperHamApp* app = context;
+    uint32_t a;
+
+    a = strtoul(app->f_edit, NULL, 10);
+    if(a) if(furi_hal_subghz_is_frequency_valid(a)) app->freq_edit_hz = a;
+
+    femenu(app);
+    view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewFreqEdit);
 }
 
 
@@ -993,6 +1236,8 @@ static void flipperham_menu_free(FlipperHamApp* app)
         view_dispatcher_remove_view(app->view_dispatcher, FlipperHamViewCall);
         view_dispatcher_remove_view(app->view_dispatcher, FlipperHamViewBook);
         view_dispatcher_remove_view(app->view_dispatcher, FlipperHamViewC2);
+        view_dispatcher_remove_view(app->view_dispatcher, FlipperHamViewFreq);
+        view_dispatcher_remove_view(app->view_dispatcher, FlipperHamViewFreqEdit);
         view_dispatcher_remove_view(app->view_dispatcher, FlipperHamViewSsid);
         view_dispatcher_remove_view(app->view_dispatcher, FlipperHamViewTextInput);
         view_dispatcher_free(app->view_dispatcher);
@@ -1047,10 +1292,22 @@ static void flipperham_menu_free(FlipperHamApp* app)
           app->book_menu = NULL;
       }
 
+    if(app->freq_menu)
+    {
+        submenu_free(app->freq_menu);
+        app->freq_menu = NULL;
+    }
+
     if(app->c2_menu)
     {
         submenu_free(app->c2_menu);
         app->c2_menu = NULL;
+    }
+
+    if(app->freq_edit_menu)
+    {
+        variable_item_list_free(app->freq_edit_menu);
+        app->freq_edit_menu = NULL;
     }
 
     if(app->ssid_menu)
@@ -1093,8 +1350,10 @@ static FlipperHamApp* flipperham_app_alloc(void)
     app->call_menu = submenu_alloc();
     app->book_menu = submenu_alloc();
     app->c2_menu = submenu_alloc();
+    app->freq_menu = submenu_alloc();
     app->settings_menu = variable_item_list_alloc();
     app->ssid_menu = variable_item_list_alloc();
+    app->freq_edit_menu = variable_item_list_alloc();
     app->text_input = text_input_alloc();
 
         app->view_port = NULL;
@@ -1114,7 +1373,9 @@ static FlipperHamApp* flipperham_app_alloc(void)
         app->d_s = 0;
         app->edit_call_index = 0;
         app->book_call_index = 0;
+        app->freq_index = 0;
         app->c2_h[0] = 0;
+        app->f_edit[0] = 0;
         app->go_v = FlipperHamViewMenu;
         app->txt = 0;
         app->pkt = malloc(sizeof(Packet));
@@ -1140,6 +1401,7 @@ static FlipperHamApp* flipperham_app_alloc(void)
     mmenu(app);
     cmenu(app);
     bkmenu(app);
+    fmenu(app);
     rmenu(app);
     ssidfix(app);
 
@@ -1153,9 +1415,13 @@ static FlipperHamApp* flipperham_app_alloc(void)
     view_set_previous_callback(submenu_get_view(app->call_menu), flipperham_call_exit_callback);
     view_set_previous_callback(submenu_get_view(app->book_menu), bookx);
     view_set_previous_callback(submenu_get_view(app->c2_menu), c2x);
+    view_set_previous_callback(submenu_get_view(app->freq_menu), flipperham_freq_exit_callback);
+    view_set_previous_callback(variable_item_list_get_view(app->freq_edit_menu), flipperham_freq_edit_exit_callback);
     view_set_previous_callback(variable_item_list_get_view(app->ssid_menu), flipperham_ssid_exit_callback);
     view_set_previous_callback(text_input_get_view(app->text_input), flipperham_text_exit_callback);
     variable_item_list_set_enter_callback(app->ssid_menu, se, app);
+    variable_item_list_set_enter_callback(app->settings_menu, re, app);
+    variable_item_list_set_enter_callback(app->freq_edit_menu, fe, app);
 
 
     view_dispatcher_add_view( app->view_dispatcher, FlipperHamViewMenu, submenu_get_view(app->submenu));
@@ -1167,6 +1433,8 @@ static FlipperHamApp* flipperham_app_alloc(void)
     view_dispatcher_add_view( app->view_dispatcher, FlipperHamViewCall, submenu_get_view(app->call_menu));
     view_dispatcher_add_view( app->view_dispatcher, FlipperHamViewBook, submenu_get_view(app->book_menu));
     view_dispatcher_add_view( app->view_dispatcher, FlipperHamViewC2, submenu_get_view(app->c2_menu));
+    view_dispatcher_add_view( app->view_dispatcher, FlipperHamViewFreq, submenu_get_view(app->freq_menu));
+    view_dispatcher_add_view( app->view_dispatcher, FlipperHamViewFreqEdit, variable_item_list_get_view(app->freq_edit_menu));
     view_dispatcher_add_view( app->view_dispatcher, FlipperHamViewSsid, variable_item_list_get_view(app->ssid_menu));
     view_dispatcher_add_view( app->view_dispatcher, FlipperHamViewTextInput, text_input_get_view(app->text_input));
     view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewMenu);
@@ -1254,6 +1522,7 @@ static void flipperham_send_hardcoded_message(FlipperHamApp* app)
 static void bx0(void* context, uint32_t index) { bx(context, InputTypeShort, index); }
 static void sx0(void* context, uint32_t index) { sx(context, InputTypeShort, index); }
 static void cx0(void* context, uint32_t index) { cx(context, InputTypeShort, index); }
+static void fq0(void* context, uint32_t index) { fq(context, InputTypeShort, index); }
 static void mx0(void* context, uint32_t index) { mx(context, InputTypeShort, index); }
 
 

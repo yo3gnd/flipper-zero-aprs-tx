@@ -31,6 +31,7 @@ extern const FlipperHamModemProfile flipperham_modem_profiles[2];
 
 void flipperham_radio_start(FlipperHamApp* app);
 void pf(FlipperHamApp* app);
+uint32_t txf(FlipperHamApp* app);
 
 
 void txstart(FlipperHamApp* app);

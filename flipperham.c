@@ -33,15 +33,19 @@ static void cfgdefs(FlipperHamApp* app)
     memset(app->status_used, 0, sizeof(app->status_used));
     memset(app->message_used, 0, sizeof(app->message_used));
     memset(app->calls_used, 0, sizeof(app->calls_used));
+    memset(app->freq, 0, sizeof(app->freq));
+    memset(app->freq_used, 0, sizeof(app->freq_used));
 
     app->bulletin_n = 0;
     app->status_n = 0;
 
     app->message_n = 0;
     app->calls_n = 0;
+    app->freq_n = 0;
 
     app->encoding_index = FlipperHamModemProfileDefault;
     app->rf_m = 0; app->rf_d = 1;
+    app->tx_freq_index = 0;
 
 
     snprintf(app->bulletin[0], sizeof(app->bulletin[0]), "flipper bulletin");
@@ -61,6 +65,9 @@ static void cfgdefs(FlipperHamApp* app)
         app->status_n = 1;
         app->message_n = 1;
         app->calls_n = 2;
+        app->freq[0] = CARRIER_HZ;
+        app->freq_used[0] = 1;
+        app->freq_n = 1;
 
     pf(app);
 }
@@ -78,9 +85,11 @@ void cfgsave(FlipperHamApp* app)
     c->encoding_index = app->encoding_index;
     c->rf_m = app->rf_m;
     c->rf_d = app->rf_d;
+    c->tx_freq_index = app->tx_freq_index;
 
     memcpy(c->bulletin, app->bulletin, sizeof(c->bulletin));
     memcpy(c->status, app->status, sizeof(c->status));
+    memcpy(c->freq, app->freq, sizeof(c->freq));
 
 
     memcpy(c->message, app->message, sizeof(c->message));
@@ -89,11 +98,13 @@ void cfgsave(FlipperHamApp* app)
     memcpy(c->bulletin_used, app->bulletin_used, sizeof(c->bulletin_used));
     memcpy(c->status_used, app->status_used, sizeof(c->status_used));
     memcpy(c->message_used, app->message_used, sizeof(c->message_used));
+    memcpy(c->freq_used, app->freq_used, sizeof(c->freq_used));
 
     c->bulletin_n = app->bulletin_n;
     c->status_n = app->status_n;
 
     c->message_n = app->message_n;
+    c->freq_n = app->freq_n;
 
     storage = furi_record_open(RECORD_STORAGE);
     file = storage_file_alloc(storage);
@@ -269,19 +280,23 @@ void cfgload(FlipperHamApp* app)
     app->encoding_index = c->encoding_index;
     app->rf_m = c->rf_m;
     app->rf_d = c->rf_d;
+    app->tx_freq_index = c->tx_freq_index;
 
     memcpy(app->bulletin, c->bulletin, sizeof(app->bulletin));
     memcpy(app->status, c->status, sizeof(app->status));
+    memcpy(app->freq, c->freq, sizeof(app->freq));
     memcpy(app->message, c->message, sizeof(app->message));
 
     memcpy(app->bulletin_used, c->bulletin_used, sizeof(app->bulletin_used));
     memcpy(app->status_used, c->status_used, sizeof(app->status_used));
     memcpy(app->message_used, c->message_used, sizeof(app->message_used));
+    memcpy(app->freq_used, c->freq_used, sizeof(app->freq_used));
 
     app->bulletin_n = c->bulletin_n;
     app->status_n = c->status_n;
 
     app->message_n = c->message_n;
+    app->freq_n = c->freq_n;
 
     if(app->encoding_index >= (sizeof(flipperham_modem_profiles) / sizeof(flipperham_modem_profiles[0])))
         app->encoding_index = FlipperHamModemProfileDefault;
@@ -298,6 +313,7 @@ void cfgload(FlipperHamApp* app)
     bfix(app);
     stfix(app);
     mfix(app);
+    ffix(app);
     cloadtxt(app);
 
     free(c);
@@ -361,6 +377,39 @@ void mfix(FlipperHamApp* app)
 
         if(app->message_used[i]) app->message_n++;
     }
+}
+
+void ffix(FlipperHamApp* app)
+{
+    uint8_t i;
+    uint8_t a;
+
+    app->freq_n = 0;
+
+    for(i = 0; i < FREQ_N; i++)
+    {
+        if(app->freq[i] && furi_hal_subghz_is_frequency_valid(app->freq[i])) app->freq_used[i] = 1;
+        else app->freq_used[i] = 0;
+
+        if(app->freq_used[i]) app->freq_n++;
+    }
+
+    if(!app->freq_n)
+    {
+        app->freq[0] = CARRIER_HZ;
+        app->freq_used[0] = 1;
+        app->freq_n = 1;
+        app->tx_freq_index = 0;
+        return;
+    }
+
+    if(app->tx_freq_index < FREQ_N && app->freq_used[app->tx_freq_index]) return;
+
+    for(a = 0; a < FREQ_N; a++)
+        if(app->freq_used[a]) {
+            app->tx_freq_index = a;
+            return;
+        }
 }
 
 bool csplit(const char* s, char* out, uint8_t* ssid, bool* has_ssid)

@@ -17,5 +17,6 @@ void bfix(FlipperHamApp* app);
 void stfix(FlipperHamApp* app);
 void mfix(FlipperHamApp* app);
 void cfix(FlipperHamApp* app);
+void ffix(FlipperHamApp* app);
 
 #endif
