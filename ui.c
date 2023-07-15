@@ -68,6 +68,10 @@ static void se(void* context, uint32_t index);
 static void re(void* context, uint32_t index);
 static void fe(void* context, uint32_t index);
 static uint32_t fstep(uint32_t a, int8_t d);
+static uint32_t fminhz(void);
+static uint32_t fmaxhz(void);
+static bool fband(uint32_t a, uint32_t* lo, uint32_t* hi);
+static uint32_t fnextband(uint32_t a);
 
 
 static void flipperham_draw_callback(Canvas* canvas, void* context);
@@ -394,28 +398,99 @@ static void c2m(FlipperHamApp* app)
 
 static uint32_t fstep(uint32_t a, int8_t d)
 {
-    uint16_t i;
     uint32_t b;
+    uint32_t c;
+    uint32_t e;
 
     b = a;
-
-    for(i = 0; i < 240; i++)
+    if(!fband(b, &c, &e))
     {
-        if(d > 0)
-        {
-            if(b > 999999999UL - 2500UL) break;
-            b += 2500UL;
-        }
-        else
-        {
-            if(b < 2500UL) break;
-            b -= 2500UL;
-        }
+        c = fminhz();
+        e = fmaxhz();
+        if(b < c) b = c;
+        if(b > e) b = e;
+        if(!fband(b, &c, &e)) return b;
+    }
 
+    if(d > 0)
+    {
+        if(b >= e) return e;
+        b += 2500UL;
+        if(b > e) b = e;
+    }
+    else
+    {
+        if(b <= c) return c;
+        b -= 2500UL;
+        if(b < c) b = c;
+    }
+
+    return b;
+}
+
+static uint32_t fminhz(void)
+{
+    uint32_t a;
+
+    for(a = 0; a < 1000000000UL; a += 2500UL)
+        if(furi_hal_subghz_is_frequency_valid(a)) return a;
+
+    return CARRIER_HZ;
+}
+
+static uint32_t fmaxhz(void)
+{
+    uint32_t a;
+
+    for(a = 1000000000UL - 1; a > 2500UL; a -= 2500UL)
+        if(furi_hal_subghz_is_frequency_valid(a)) return a;
+
+    return CARRIER_HZ;
+}
+
+static bool fband(uint32_t a, uint32_t* lo, uint32_t* hi)
+{
+    uint32_t b;
+
+    if(!furi_hal_subghz_is_frequency_valid(a)) return false;
+
+    b = a;
+    while(b >= 2500UL)
+    {
+        if(!furi_hal_subghz_is_frequency_valid(b - 2500UL)) break;
+        b -= 2500UL;
+    }
+    *lo = b;
+
+    b = a;
+    while(b <= 1000000000UL - 2500UL)
+    {
+        if(!furi_hal_subghz_is_frequency_valid(b + 2500UL)) break;
+        b += 2500UL;
+    }
+    *hi = b;
+
+    return true;
+}
+
+static uint32_t fnextband(uint32_t a)
+{
+    uint32_t c;
+    uint32_t e;
+    uint32_t b;
+    uint32_t mx;
+
+    mx = fmaxhz();
+    if(!fband(a, &c, &e)) return fminhz();
+
+    b = e;
+    while(b <= mx - 2500UL)
+    {
+        b += 2500UL;
         if(furi_hal_subghz_is_frequency_valid(b)) return b;
     }
 
-    return a;
+    return fminhz();
 }
 
 static void fmenu(FlipperHamApp* app)
@@ -447,12 +522,12 @@ static void femenu(FlipperHamApp* app)
     snprintf(app->f_edit, sizeof(app->f_edit), "%lu", (unsigned long)app->freq_edit_hz);
     variable_item_set_current_value_text(it, app->f_edit);
 
-    variable_item_list_add(app->freq_edit_menu, "Enter frequency", 1, NULL, NULL);
+    it = variable_item_list_add(app->freq_edit_menu, "Enter frequency", 1, NULL, NULL);
+    variable_item_set_current_value_index(it, 0);
+    variable_item_set_current_value_text(it, app->f_bad ? "bad" : "");
 
-    if(app->freq_n > 1)
-        if(app->freq_index < FREQ_N)
-            if(app->freq_used[app->freq_index])
-                variable_item_list_add(app->freq_edit_menu, "Delete", 1, NULL, NULL);
+    if(app->freq_n > 1) if(app->freq_index < FREQ_N) if(app->freq_used[app->freq_index])
+        variable_item_list_add(app->freq_edit_menu, "Delete", 1, NULL, NULL);
 
     variable_item_list_add(app->freq_edit_menu, "Select for TX", 1, NULL, NULL);
     variable_item_list_set_selected_item(app->freq_edit_menu, 0);
@@ -589,20 +664,21 @@ static void rc(VariableItem* item)
 static void fc(VariableItem* item)
 {
     FlipperHamApp* app = variable_item_get_context(item);
-    uint8_t i;
+    uint8_t a;
 
-    i = variable_item_get_current_value_index(item);
+    app->f_bad = false;
+    a = variable_item_get_current_value_index(item);
 
-    while(i > 100)
+    while(a > 100)
     {
         app->freq_edit_hz = fstep(app->freq_edit_hz, 1);
-        i--;
+        a--;
     }
 
-    while(i < 100)
+    while(a < 100)
     {
         app->freq_edit_hz = fstep(app->freq_edit_hz, -1);
-        i++;
+        a++;
     }
 
     snprintf(app->f_edit, sizeof(app->f_edit), "%lu", (unsigned long)app->freq_edit_hz);
@@ -634,13 +710,19 @@ static void re(void* context, uint32_t index)
 static void fe(void* context, uint32_t index)
 {
     FlipperHamApp* app = context;
-    bool d;
+    bool a;
 
-    d = false;
-    if(app->freq_n > 1)
-        if(app->freq_index < FREQ_N)
-            if(app->freq_used[app->freq_index])
-                d = true;
+    a = false;
+    if(app->freq_n > 1) if(app->freq_index < FREQ_N) if(app->freq_used[app->freq_index]) a = true;
+
+    if(index == 0)
+    {
+        app->f_bad = false;
+        app->freq_edit_hz = fnextband(app->freq_edit_hz);
+        femenu(app);
+        view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewFreqEdit);
+        return;
+    }
 
     if(index == 1)
     {
@@ -653,7 +735,7 @@ static void fe(void* context, uint32_t index)
         return;
     }
 
-    if(d && index == 2)
+    if(a && index == 2)
     {
         app->freq[app->freq_index] = 0;
         app->freq_used[app->freq_index] = 0;
@@ -665,7 +747,7 @@ static void fe(void* context, uint32_t index)
         return;
     }
 
-    if((d && index == 3) || (!d && index == 2))
+    if((a && index == 3) || (!a && index == 2))
     {
         if(app->freq_index >= FREQ_N) return;
         if(!furi_hal_subghz_is_frequency_valid(app->freq_edit_hz)) return;
@@ -685,15 +767,16 @@ static void fe(void* context, uint32_t index)
 static void fq(void* context, InputType input_type, uint32_t index)
 {
     FlipperHamApp* app = context;
-    uint8_t i;
+    uint8_t a;
 
     if(index == FlipperHamFreqIndexAdd)
     {
         app->freq_index = 0xff;
+        app->f_bad = false;
 
-        for(i = 0; i < FREQ_N; i++)
-            if(!app->freq_used[i]) {
-                app->freq_index = i;
+        for(a = 0; a < FREQ_N; a++)
+            if(!app->freq_used[a]) {
+                app->freq_index = a;
                 break;
             }
 
@@ -705,24 +788,26 @@ static void fq(void* context, InputType input_type, uint32_t index)
         return;
     }
 
-    i = index - FlipperHamFreqIndexBase;
-    if(i >= FREQ_N) return;
-    if(!app->freq_used[i]) return;
+    a = index - FlipperHamFreqIndexBase;
+    if(a >= FREQ_N) return;
+    if(!app->freq_used[a]) return;
 
     if(input_type == InputTypeLong)
     {
-        app->tx_freq_index = i;
+        app->tx_freq_index = a;
+        app->f_bad = false;
         cfgsave(app);
         fmenu(app);
         rmenu(app);
-        submenu_set_selected_item(app->freq_menu, FlipperHamFreqIndexBase + i);
+        submenu_set_selected_item(app->freq_menu, FlipperHamFreqIndexBase + a);
         return;
     }
 
     if(input_type != InputTypeShort) return;
 
-    app->freq_index = i;
-    app->freq_edit_hz = app->freq[i];
+    app->freq_index = a;
+    app->freq_edit_hz = app->freq[a];
+    app->f_bad = false;
     femenu(app);
     view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewFreqEdit);
 }
@@ -733,7 +818,11 @@ static void fsave(void* context)
     uint32_t a;
 
     a = strtoul(app->f_edit, NULL, 10);
-    if(a) if(furi_hal_subghz_is_frequency_valid(a)) app->freq_edit_hz = a;
+    if(a && furi_hal_subghz_is_frequency_valid(a)) {
+        app->freq_edit_hz = a;
+        app->f_bad = false;
+    }
+    else app->f_bad = true;
 
     femenu(app);
     view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewFreqEdit);
@@ -1376,6 +1465,7 @@ static FlipperHamApp* flipperham_app_alloc(void)
         app->freq_index = 0;
         app->c2_h[0] = 0;
         app->f_edit[0] = 0;
+        app->f_bad = false;
         app->go_v = FlipperHamViewMenu;
         app->txt = 0;
         app->pkt = malloc(sizeof(Packet));

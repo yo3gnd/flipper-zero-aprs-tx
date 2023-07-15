@@ -68,6 +68,7 @@ typedef struct FlipperHamApp
     uint8_t calls_n;
     uint8_t freq_n;
     uint8_t tx_freq_index;
+    bool f_bad;
     uint8_t tx_msg_index;
     uint8_t tx_t;
     uint8_t bulletin_index;
