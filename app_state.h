@@ -79,6 +79,13 @@ typedef struct FlipperHamApp
     uint8_t edit_call_index;
     uint8_t book_call_index;
     uint8_t freq_index;
+    uint16_t b_sel;
+    uint16_t st_sel;
+    uint16_t m_sel;
+    uint16_t c_sel;
+      uint16_t bk_sel;
+    uint16_t c2_sel;
+    uint16_t f_sel;
     uint8_t txt;
     char b_edit[TXT_LEN];
     char st_edit[TXT_LEN];
