@@ -24,6 +24,7 @@ typedef struct
     uint8_t rf_m;
     uint8_t rf_d;
     uint8_t tx_freq_index;
+    uint8_t d_s;
 
     char bulletin[TXT_N][TXT_LEN];
     char status[TXT_N][TXT_LEN];
