@@ -47,6 +47,7 @@ static void cfgdefs(FlipperHamApp* app)
     app->rf_m = 0; app->rf_d = 1;
     app->tx_freq_index = 0;
     app->d_s = 0;
+    app->repeat_n = 1;
 
 
     snprintf(app->bulletin[0], sizeof(app->bulletin[0]), "flipper bulletin");
@@ -88,6 +89,7 @@ void cfgsave(FlipperHamApp* app)
     c->rf_d = app->rf_d;
     c->tx_freq_index = app->tx_freq_index;
     c->d_s = app->d_s;
+    c->repeat_n = app->repeat_n;
 
     memcpy(c->bulletin, app->bulletin, sizeof(c->bulletin));
     memcpy(c->status, app->status, sizeof(c->status));
@@ -284,6 +286,7 @@ void cfgload(FlipperHamApp* app)
     app->rf_d = c->rf_d;
     app->tx_freq_index = c->tx_freq_index;
     app->d_s = c->d_s;
+    app->repeat_n = c->repeat_n;
 
     memcpy(app->bulletin, c->bulletin, sizeof(app->bulletin));
     memcpy(app->status, c->status, sizeof(app->status));
@@ -305,6 +308,7 @@ void cfgload(FlipperHamApp* app)
         app->encoding_index = FlipperHamModemProfileDefault;
 
     if(app->d_s > 15) app->d_s = 0;
+    if(!app->repeat_n || app->repeat_n > 5) app->repeat_n = 1;
 
     pf(app);
 

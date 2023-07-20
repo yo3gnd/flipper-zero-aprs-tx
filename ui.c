@@ -724,6 +724,7 @@ static void rc(VariableItem* item)
     app->repeat_n = variable_item_get_current_value_index(item) + 1;
     snprintf(a, sizeof(a), "%u", app->repeat_n);
     variable_item_set_current_value_text(item, a);
+    cfgsave(app);
 }
 
 static void fc(VariableItem* item)
