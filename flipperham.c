@@ -28,11 +28,15 @@ static void cfgdefs(FlipperHamApp* app)
     memset(app->status, 0, sizeof(app->status));
     memset(app->message, 0, sizeof(app->message));
     memset(app->calls, 0, sizeof(app->calls));
+    memset(app->pos_name, 0, sizeof(app->pos_name));
+    memset(app->pos_lat, 0, sizeof(app->pos_lat));
+    memset(app->pos_lon, 0, sizeof(app->pos_lon));
 
     memset(app->bulletin_used, 0, sizeof(app->bulletin_used));
     memset(app->status_used, 0, sizeof(app->status_used));
     memset(app->message_used, 0, sizeof(app->message_used));
     memset(app->calls_used, 0, sizeof(app->calls_used));
+    memset(app->pos_used, 0, sizeof(app->pos_used));
     memset(app->freq, 0, sizeof(app->freq));
     memset(app->freq_used, 0, sizeof(app->freq_used));
 
@@ -41,6 +45,7 @@ static void cfgdefs(FlipperHamApp* app)
 
     app->message_n = 0;
     app->calls_n = 0;
+    app->pos_n = 0;
     app->freq_n = 0;
 
     app->encoding_index = FlipperHamModemProfileDefault;
@@ -54,6 +59,9 @@ static void cfgdefs(FlipperHamApp* app)
     snprintf(app->status[0], sizeof(app->status[0]), "flipper status");
     snprintf(app->calls[0], sizeof(app->calls[0]), "FL1PER");
     snprintf(app->calls[1], sizeof(app->calls[1]), "YO3GND-12");
+    snprintf(app->pos_name[0], sizeof(app->pos_name[0]), "Null Island");
+    snprintf(app->pos_lat[0], sizeof(app->pos_lat[0]), "0.02");
+    snprintf(app->pos_lon[0], sizeof(app->pos_lon[0]), "-0.04");
 
         snprintf(app->message[0], sizeof(app->message[0]), "Hello from Flipper Zero! :D");
 
@@ -62,11 +70,13 @@ static void cfgdefs(FlipperHamApp* app)
         app->message_used[0] = 1;
         app->calls_used[0] = 1;
         app->calls_used[1] = 1;
+        app->pos_used[0] = 1;
 
         app->bulletin_n = 1;
         app->status_n = 1;
         app->message_n = 1;
         app->calls_n = 2;
+        app->pos_n = 1;
         app->freq[0] = CARRIER_HZ;
         app->freq_used[0] = 1;
         app->freq_n = 1;
@@ -97,17 +107,22 @@ void cfgsave(FlipperHamApp* app)
 
 
     memcpy(c->message, app->message, sizeof(c->message));
+    memcpy(c->pos_name, app->pos_name, sizeof(c->pos_name));
+    memcpy(c->pos_lat, app->pos_lat, sizeof(c->pos_lat));
+    memcpy(c->pos_lon, app->pos_lon, sizeof(c->pos_lon));
 
 
     memcpy(c->bulletin_used, app->bulletin_used, sizeof(c->bulletin_used));
     memcpy(c->status_used, app->status_used, sizeof(c->status_used));
     memcpy(c->message_used, app->message_used, sizeof(c->message_used));
     memcpy(c->freq_used, app->freq_used, sizeof(c->freq_used));
+    memcpy(c->pos_used, app->pos_used, sizeof(c->pos_used));
 
     c->bulletin_n = app->bulletin_n;
     c->status_n = app->status_n;
 
     c->message_n = app->message_n;
+    c->pos_n = app->pos_n;
     c->freq_n = app->freq_n;
 
     storage = furi_record_open(RECORD_STORAGE);
@@ -292,16 +307,21 @@ void cfgload(FlipperHamApp* app)
     memcpy(app->status, c->status, sizeof(app->status));
     memcpy(app->freq, c->freq, sizeof(app->freq));
     memcpy(app->message, c->message, sizeof(app->message));
+    memcpy(app->pos_name, c->pos_name, sizeof(app->pos_name));
+    memcpy(app->pos_lat, c->pos_lat, sizeof(app->pos_lat));
+    memcpy(app->pos_lon, c->pos_lon, sizeof(app->pos_lon));
 
     memcpy(app->bulletin_used, c->bulletin_used, sizeof(app->bulletin_used));
     memcpy(app->status_used, c->status_used, sizeof(app->status_used));
     memcpy(app->message_used, c->message_used, sizeof(app->message_used));
+    memcpy(app->pos_used, c->pos_used, sizeof(app->pos_used));
     memcpy(app->freq_used, c->freq_used, sizeof(app->freq_used));
 
     app->bulletin_n = c->bulletin_n;
     app->status_n = c->status_n;
 
     app->message_n = c->message_n;
+    app->pos_n = c->pos_n;
     app->freq_n = c->freq_n;
 
     if(app->encoding_index >= (sizeof(flipperham_modem_profiles) / sizeof(flipperham_modem_profiles[0])))
@@ -317,11 +337,15 @@ void cfgload(FlipperHamApp* app)
         app->bulletin[i][TXT_LEN - 1] = 0;
         app->status[i][TXT_LEN - 1] = 0;
         app->message[i][TXT_LEN - 1] = 0;
+        app->pos_name[i][TXT_LEN - 1] = 0;
+        app->pos_lat[i][POS_LEN - 1] = 0;
+        app->pos_lon[i][POS_LEN - 1] = 0;
     }
 
     bfix(app);
     stfix(app);
     mfix(app);
+    pfix(app);
     ffix(app);
     cloadtxt(app);
 
@@ -370,6 +394,21 @@ void cfix(FlipperHamApp* app)
         else app->calls_used[i] = 0;
 
         if(app->calls_used[i]) app->calls_n++;
+    }
+}
+
+void pfix(FlipperHamApp* app)
+{
+    uint8_t i;
+
+    app->pos_n = 0;
+
+    for(i = 0; i < TXT_N; i++)
+    {
+        if(app->pos_name[i][0]) app->pos_used[i] = 1;
+        else app->pos_used[i] = 0;
+
+        if(app->pos_used[i]) app->pos_n++;
     }
 }
 

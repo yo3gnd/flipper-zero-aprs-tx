@@ -4,7 +4,7 @@ App(
     apptype=FlipperAppType.EXTERNAL,
     entry_point="flipperham_app",
     requires=["gui"],
-    sources=["flipperham.c", "packet.c", "rf_gen.c", "ui.c"],
+    sources=["flipperham.c", "packet.c", "aprs.c", "rf_gen.c", "ui.c"],
     stack_size=2 * 1024,
     fap_icon="flipperham.png",
     fap_category="Tools",

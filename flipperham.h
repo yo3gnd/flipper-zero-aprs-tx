@@ -10,6 +10,7 @@
 #define MY_CALL       "FL1PER"
 #define CARRIER_HZ    433250000UL
 #define FREQ_N        4
+#define POS_LEN       16
 
 #define CFG_DIR       "/ext/apps_data/aprstx"
 #define CALLBOOK_FILE "/ham/callbook.txt"
@@ -31,18 +32,23 @@ typedef struct
     char status[TXT_N][TXT_LEN];
     char message[TXT_N][TXT_LEN];
     char calls[CALL_N][CALL_LEN];
+    char pos_name[TXT_N][TXT_LEN];
+    char pos_lat[TXT_N][POS_LEN];
+    char pos_lon[TXT_N][POS_LEN];
     uint32_t freq[FREQ_N];
 
     uint8_t bulletin_used[TXT_N];
     uint8_t status_used[TXT_N];
     uint8_t message_used[TXT_N];
     uint8_t calls_used[CALL_N];
+    uint8_t pos_used[TXT_N];
     uint8_t freq_used[FREQ_N];
 
     uint8_t bulletin_n;
     uint8_t status_n;
     uint8_t message_n;
     uint8_t calls_n;
+    uint8_t pos_n;
     uint8_t freq_n;
 } FlipperHamCfg;
 
@@ -55,6 +61,7 @@ enum
     FlipperHamViewBulletin,
     FlipperHamViewStatus,
     FlipperHamViewMessage,
+    FlipperHamViewPosition,
     FlipperHamViewSsid,
     FlipperHamViewCall,
     FlipperHamViewBook,
@@ -62,6 +69,7 @@ enum
     FlipperHamViewTextInput,
     FlipperHamViewFreq,
     FlipperHamViewFreqEdit,
+    FlipperHamViewPosEdit,
 };
 
 
@@ -76,6 +84,7 @@ enum
 enum
 {
     FlipperHamSendIndexMessage = 0,
+    FlipperHamSendIndexPosition,
     FlipperHamSendIndexStatus,
     FlipperHamSendIndexBulletin,
 };
@@ -112,6 +121,13 @@ enum
 {
     FlipperHamMessageIndexAdd = 0,
     FlipperHamMessageIndexBase = 400,
+};
+
+
+enum
+{
+    FlipperHamPositionIndexAdd = 0,
+    FlipperHamPositionIndexBase = 450,
 };
 
 

@@ -1,4 +1,5 @@
 #include "rf_gen.h"
+#include "aprs.h"
 
 #include <furi_hal.h>
 #include <cc1101_regs.h>
@@ -204,6 +205,14 @@ void txstart(FlipperHamApp* app)
         if(!app->status[app->tx_msg_index][0]) return;
 
         snprintf(message, sizeof(message), ">%s", app->status[app->tx_msg_index]);
+    }
+    else if(app->tx_t == 3)
+    {
+        if(!app->pos_used[app->tx_msg_index]) return;
+        if(!app->pos_name[app->tx_msg_index][0]) return;
+        if(!app->pos_lat[app->tx_msg_index][0]) return;
+        if(!app->pos_lon[app->tx_msg_index][0]) return;
+        if(!aprs_pos(message, sizeof(message), app->pos_name[app->tx_msg_index], app->pos_lat[app->tx_msg_index], app->pos_lon[app->tx_msg_index])) return;
     }
     else
     {
