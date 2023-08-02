@@ -176,6 +176,7 @@ void txstart(FlipperHamApp* app)
     bool has_ssid;
 
     app->tx_done = false;
+    app->tx_ok = false;
     app->wave_i = 0;
     app->level = true;
     app->wave_len = 0;
@@ -270,6 +271,7 @@ void txstart(FlipperHamApp* app)
     }
 
     if(!app->wave_len) app->tx_done = true;
+    else app->tx_ok = true;
 }
 
 

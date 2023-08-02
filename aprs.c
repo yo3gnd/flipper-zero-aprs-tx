@@ -59,6 +59,33 @@ static int ll(char* out, uint16_t n, const char* s, uint8_t lon)
     return snprintf(out, n, "%02d%02d.%02d%c", d, m, h, hemi);
 }
 
+int aprs_ll_clamp(char* out, uint16_t n, const char* s, uint8_t lon)
+{
+    float a;
+    char* e;
+
+    if(!out) return 0;
+    if(!n) return 0;
+    if(!s) return 0;
+
+    a = strtof(s, &e);
+    if(e == s) return 0;
+    if(*e) return 0;
+
+    if(lon)
+    {
+        if(a < -180.0f) a = -180.0f;
+        if(a > 180.0f) a = 180.0f;
+    }
+    else
+    {
+        if(a < -90.0f) a = -90.0f;
+        if(a > 90.0f) a = 90.0f;
+    }
+
+    return snprintf(out, n, "%.5f", (double)a);
+}
+
 int aprs_lat(char* out, uint16_t n, const char* s)
 {
     return ll(out, n, s, 0);

@@ -1,5 +1,6 @@
 #include "flipperham.h"
 #include "packet.h"
+#include "aprs.h"
 #include "app_state.h"
 #include "rf_gen.h"
 #include "ui.h"
@@ -21,6 +22,23 @@
 #include <string.h>
 
 static void cloadtxt(FlipperHamApp* app);
+
+static uint8_t pgood(FlipperHamApp* app, uint8_t i)
+{
+    char a[POS_LEN];
+    char b[POS_LEN];
+
+    if(i >= TXT_N) return 0;
+    if(!app->pos_name[i][0]) return 0;
+    if(!app->pos_lat[i][0]) return 0;
+    if(!app->pos_lon[i][0]) return 0;
+    if(!aprs_ll_clamp(a, sizeof(a), app->pos_lat[i], 0)) return 0;
+    if(!aprs_ll_clamp(b, sizeof(b), app->pos_lon[i], 1)) return 0;
+
+    snprintf(app->pos_lat[i], sizeof(app->pos_lat[i]), "%s", a);
+    snprintf(app->pos_lon[i], sizeof(app->pos_lon[i]), "%s", b);
+    return 1;
+}
 
 static void cfgdefs(FlipperHamApp* app)
 {
@@ -405,7 +423,7 @@ void pfix(FlipperHamApp* app)
 
     for(i = 0; i < TXT_N; i++)
     {
-        if(app->pos_name[i][0]) app->pos_used[i] = 1;
+        if(pgood(app, i)) app->pos_used[i] = 1;
         else app->pos_used[i] = 0;
 
         if(app->pos_used[i]) app->pos_n++;

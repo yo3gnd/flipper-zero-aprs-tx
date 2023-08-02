@@ -1,4 +1,5 @@
 #include "flipperham.h"
+#include "aprs.h"
 #include "ui.h"
 #include "rf_gen.h"
 
@@ -1178,16 +1179,14 @@ static void p(void* context, uint32_t index)
 
     if(app->pos_index == 0xff) return;
 
-    snprintf(app->pos_name[app->pos_index], sizeof(app->pos_name[app->pos_index]), "Position");
-    snprintf(app->pos_lat[app->pos_index], sizeof(app->pos_lat[app->pos_index]), "0.00");
-    snprintf(app->pos_lon[app->pos_index], sizeof(app->pos_lon[app->pos_index]), "0.00");
-    app->pos_used[app->pos_index] = 1;
-    pfix(app);
-    cfgsave(app);
+    app->pos_name[app->pos_index][0] = 0;
+    app->pos_lat[app->pos_index][0] = 0;
+    app->pos_lon[app->pos_index][0] = 0;
+    app->pos_used[app->pos_index] = 0;
 
-    snprintf(app->p_name_edit, sizeof(app->p_name_edit), "%s", app->pos_name[app->pos_index]);
-    snprintf(app->p_lat_edit, sizeof(app->p_lat_edit), "%s", app->pos_lat[app->pos_index]);
-    snprintf(app->p_lon_edit, sizeof(app->p_lon_edit), "%s", app->pos_lon[app->pos_index]);
+    snprintf(app->p_name_edit, sizeof(app->p_name_edit), "Position");
+    snprintf(app->p_lat_edit, sizeof(app->p_lat_edit), "0.00");
+    snprintf(app->p_lon_edit, sizeof(app->p_lon_edit), "0.00");
     pemenu(app);
     view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewPosEdit);
 }
@@ -1226,13 +1225,26 @@ static void psave(void* context)
 {
     FlipperHamApp* app = context;
     uint8_t i, j;
+    char a[POS_LEN];
 
     i = app->pos_index;
     if(i >= TXT_N) return;
 
     if(app->txt == 6) snprintf(app->pos_name[i], sizeof(app->pos_name[i]), "%s", app->p_name_edit);
-    if(app->txt == 7) snprintf(app->pos_lat[i], sizeof(app->pos_lat[i]), "%s", app->p_lat_edit);
-    if(app->txt == 8) snprintf(app->pos_lon[i], sizeof(app->pos_lon[i]), "%s", app->p_lon_edit);
+    if(app->txt == 7)
+    {
+        if(aprs_ll_clamp(a, sizeof(a), app->p_lat_edit, 0)) snprintf(app->p_lat_edit, sizeof(app->p_lat_edit), "%s", a);
+        else if(app->pos_lat[i][0]) snprintf(app->p_lat_edit, sizeof(app->p_lat_edit), "%s", app->pos_lat[i]);
+        else snprintf(app->p_lat_edit, sizeof(app->p_lat_edit), "0.00000");
+        snprintf(app->pos_lat[i], sizeof(app->pos_lat[i]), "%s", app->p_lat_edit);
+    }
+    if(app->txt == 8)
+    {
+        if(aprs_ll_clamp(a, sizeof(a), app->p_lon_edit, 1)) snprintf(app->p_lon_edit, sizeof(app->p_lon_edit), "%s", a);
+        else if(app->pos_lon[i][0]) snprintf(app->p_lon_edit, sizeof(app->p_lon_edit), "%s", app->pos_lon[i]);
+        else snprintf(app->p_lon_edit, sizeof(app->p_lon_edit), "0.00000");
+        snprintf(app->pos_lon[i], sizeof(app->pos_lon[i]), "%s", app->p_lon_edit);
+    }
 
     if(!app->pos_name[i][0])
     {
@@ -2032,6 +2044,11 @@ static void flipperham_send_hardcoded_message(FlipperHamApp* app)
         app->repeat_i = i + 1;
 
         txstart(app);
+        if(!app->tx_ok)
+        {
+            flipperham_status_view_free(app);
+            return;
+        }
         app->tx_started = false;
         app->tx_allowed = true;
         app->done_w = false;

@@ -31,6 +31,14 @@ int main(void)
     if(aprs_pos(c, sizeof(c), "Null Island", "0.02", "-0.04") == 31 && !strcmp(c, "!0001.20N/00002.40W-Null Island")) { ok++; printf("ok pos full\n"); }
     else { bad++; printf("bad pos full got=%s\n", c); }
 
+    printf("== clamp lat ==\n");
+    if(aprs_ll_clamp(a, sizeof(a), "123.45", 0) > 0 && !strcmp(a, "90.00000")) { ok++; printf("ok clamp lat\n"); }
+    else { bad++; printf("bad clamp lat got=%s\n", a); }
+
+    printf("== clamp lon ==\n");
+    if(aprs_ll_clamp(b, sizeof(b), "-222.75", 1) > 0 && !strcmp(b, "-180.00000")) { ok++; printf("ok clamp lon\n"); }
+    else { bad++; printf("bad clamp lon got=%s\n", b); }
+
     printf("ok=%d bad=%d\n", ok, bad);
     if(bad) return 1;
 

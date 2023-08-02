@@ -39,6 +39,7 @@ typedef struct FlipperHamApp
     volatile bool tx_started;
     volatile bool tx_done;
     volatile bool tx_allowed;
+    bool tx_ok;
     bool done_w;
     bool send_requested;
     uint8_t encoding_index;
