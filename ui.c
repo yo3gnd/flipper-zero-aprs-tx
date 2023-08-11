@@ -1952,7 +1952,7 @@ static void flipperham_menu_free(FlipperHamApp* app)
 
 static void gblink(void)
 {
-    furi_hal_light_set(LightGreen, 255);
+    furi_hal_light_set(LightRed | LightGreen, 255);
 }
 
 
@@ -2103,7 +2103,7 @@ static void flipperham_send_hardcoded_message(FlipperHamApp* app)
     app->repeat_t0 = furi_get_tick();
     app->repeat_to = 0;
     app->done_w = false;
-    gblink();
+    furi_hal_light_set(LightRed | LightGreen, 0);
 
     for(i = 0; i < app->repeat_n; i++)
     {
@@ -2112,7 +2112,7 @@ static void flipperham_send_hardcoded_message(FlipperHamApp* app)
         txstart(app);
         if(!app->tx_ok)
         {
-            furi_hal_light_set(LightGreen, 0);
+            furi_hal_light_set(LightRed | LightGreen, 0);
             flipperham_status_view_free(app);
             return;
         }
@@ -2124,6 +2124,7 @@ static void flipperham_send_hardcoded_message(FlipperHamApp* app)
         furi_delay_ms(100);
 
         furi_hal_power_suppress_charge_enter();
+        gblink();
         flipperham_radio_start(app);
 
         while(!app->tx_done) {
@@ -2138,6 +2139,7 @@ static void flipperham_send_hardcoded_message(FlipperHamApp* app)
 
             flipperham_radio_stop(app);
         furi_hal_power_suppress_charge_exit();
+        furi_hal_light_set(LightRed | LightGreen, 0);
 
         if(i + 1 >= app->repeat_n) break;
 
@@ -2158,7 +2160,7 @@ static void flipperham_send_hardcoded_message(FlipperHamApp* app)
     app->tx_done = true;
     view_port_update(app->view_port);
     furi_delay_ms(750);
-    furi_hal_light_set(LightGreen, 0);
+    furi_hal_light_set(LightRed | LightGreen, 0);
 
     flipperham_status_view_free(app);
 }
