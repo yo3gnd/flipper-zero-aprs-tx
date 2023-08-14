@@ -47,6 +47,8 @@ typedef struct FlipperHamApp
     uint8_t rf_d;
     uint8_t repeat_n;
     uint8_t repeat_i;
+    bool r_w;
+    bool r_x;
     Packet* pkt;
     uint16_t* wave;
     uint16_t wave_len;
@@ -97,6 +99,7 @@ typedef struct FlipperHamApp
     uint16_t c2_sel;
     uint16_t f_sel;
     uint8_t txt;
+    uint8_t txt_v;
     char b_edit[TXT_LEN];
     char st_edit[TXT_LEN];
     char m_edit[TXT_LEN];

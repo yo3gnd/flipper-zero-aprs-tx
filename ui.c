@@ -87,6 +87,7 @@ static bool fin(const char* s, uint32_t* out);
 
 
 static void flipperham_draw_callback(Canvas* canvas, void* context);
+static void stin(InputEvent* event, void* context);
 static void flipperham_status_view_alloc(FlipperHamApp* app);
 static void flipperham_status_view_free(FlipperHamApp* app);
 static void flipperham_menu_free(FlipperHamApp* app);
@@ -315,13 +316,7 @@ static uint32_t flipperham_text_exit_callback(void* context)
 {
     FlipperHamApp* app = context;
 
-    if(app->txt == 5) return FlipperHamViewFreqEdit;
-    if(app->txt >= 6) return FlipperHamViewPosEdit;
-    if(app->txt == 3) return FlipperHamViewMessage;
-    if(app->txt == 4) return FlipperHamViewBook;
-    if(app->txt == 2) return FlipperHamViewCall;
-    if(app->txt) return FlipperHamViewStatus;
-    return FlipperHamViewBulletin;
+    return app->txt_v;
 }
 
 
@@ -581,6 +576,14 @@ static void fsh(char* o, uint16_t n, uint32_t a)
     snprintf(o, n, "%06lu.%1lu", (unsigned long)(a / 1000UL), (unsigned long)((a % 1000UL) / 100UL));
 }
 
+static void fsh2(char* o, uint16_t n, uint32_t a)
+{
+    if(!o) return;
+      if(!n) return;
+
+    snprintf(o, n, "%06lu", (unsigned long)(a / 1000UL));
+}
+
 static bool fin(const char* s, uint32_t* out)
 {
     char* e;
@@ -658,7 +661,7 @@ static void femenu(FlipperHamApp* app)
 
     it = variable_item_list_add(app->freq_edit_menu, "Frequency", 201, fc, app);
     variable_item_set_current_value_index(it, 100);
-    fsh(app->f_edit, sizeof(app->f_edit), app->freq_edit_hz);
+    fsh2(app->f_edit, sizeof(app->f_edit), app->freq_edit_hz);
     variable_item_set_current_value_text(it, app->f_edit);
 
     it = variable_item_list_add(app->freq_edit_menu, "Enter frequency", 1, NULL, NULL);
@@ -697,7 +700,7 @@ static void rmenu(FlipperHamApp* app)
 
     variable_item_list_reset(app->settings_menu);
 
-    it = variable_item_list_add(app->settings_menu, "Frequen cy", 1, NULL, NULL);
+    it = variable_item_list_add(app->settings_menu, "Frequency", 1, NULL, NULL);
     fsh(a, sizeof(a), txf(app));
     variable_item_set_current_value_index(it, 0);
     variable_item_set_current_value_text(it, a);
@@ -878,7 +881,7 @@ static void fc(VariableItem* item)
         a++;
     }
 
-    fsh(app->f_edit, sizeof(app->f_edit), app->freq_edit_hz);
+    fsh2(app->f_edit, sizeof(app->f_edit), app->freq_edit_hz);
     variable_item_set_current_value_text(item, app->f_edit);
     variable_item_set_current_value_index(item, 100);
 }
@@ -929,6 +932,7 @@ static void fe(void* context, uint32_t index)
         app->f_sel = FlipperHamFreqIndexBase + app->freq_index;
         app->f_edit[0] = 0;
         app->txt = 5;
+        app->txt_v = FlipperHamViewFreqEdit;
         text_input_reset(app->text_input);
         text_input_set_header_text(app->text_input, "Frequency");
         text_input_set_result_callback(app->text_input, fsave, app, app->f_edit, sizeof(app->f_edit), false);
@@ -998,6 +1002,7 @@ static void pe(void* context, uint32_t index)
     if(index == 0)
     {
         app->txt = 6;
+        app->txt_v = FlipperHamViewPosEdit;
         text_input_reset(app->text_input);
         text_input_set_header_text(app->text_input, "Name");
         text_input_set_result_callback(app->text_input, psave, app, app->p_name_edit, sizeof(app->p_name_edit), false);
@@ -1008,6 +1013,7 @@ static void pe(void* context, uint32_t index)
     if(index == 1)
     {
         app->txt = 7;
+        app->txt_v = FlipperHamViewPosEdit;
         text_input_reset(app->text_input);
         text_input_set_header_text(app->text_input, "Latitude");
         text_input_set_result_callback(app->text_input, psave, app, app->p_lat_edit, sizeof(app->p_lat_edit), false);
@@ -1018,6 +1024,7 @@ static void pe(void* context, uint32_t index)
     if(index == 2)
     {
         app->txt = 8;
+        app->txt_v = FlipperHamViewPosEdit;
         text_input_reset(app->text_input);
         text_input_set_header_text(app->text_input, "Longitude");
         text_input_set_result_callback(app->text_input, psave, app, app->p_lon_edit, sizeof(app->p_lon_edit), false);
@@ -1152,6 +1159,7 @@ static void m(void* context, uint32_t index)
     }
 
     app->txt = 3;
+    app->txt_v = FlipperHamViewMessage;
 
     text_input_reset(app->text_input);
     text_input_set_header_text(app->text_input, "Message");
@@ -1187,6 +1195,7 @@ static void mx(void* context, InputType input_type, uint32_t index)
     app->message_index = i;
     snprintf(app->m_edit, sizeof(app->m_edit), "%s", app->message[i]);
     app->txt = 3;
+    app->txt_v = FlipperHamViewMessage;
     text_input_reset(app->text_input);
     text_input_set_header_text(app->text_input, "Message");
     text_input_set_result_callback(app->text_input, msave, app, app->m_edit, sizeof(app->m_edit), false);
@@ -1367,6 +1376,7 @@ static void flipperham_bulletin_callback(void* context, uint32_t index)
 
     app->b_edit[0] = 0;
     app->txt = 0;
+    app->txt_v = FlipperHamViewBulletin;
 
     text_input_reset(app->text_input);
     text_input_set_header_text(app->text_input, "Bulletin");
@@ -1400,6 +1410,7 @@ static void bx(void* context, InputType input_type, uint32_t index)
     app->bulletin_index = i;
     snprintf(app->b_edit, sizeof(app->b_edit), "%s", app->bulletin[i]);
     app->txt = 0;
+    app->txt_v = FlipperHamViewBulletin;
 
     text_input_reset(app->text_input);
     text_input_set_header_text(app->text_input, "Bulletin");
@@ -1468,6 +1479,7 @@ static void st(void* context, uint32_t index)
 
     app->st_edit[0] = 0;
     app->txt = 1;
+    app->txt_v = FlipperHamViewStatus;
 
     text_input_reset(app->text_input);
     text_input_set_header_text(app->text_input, "Status");
@@ -1501,6 +1513,7 @@ static void sx(void* context, InputType input_type, uint32_t index)
     app->status_index = i;
     snprintf(app->st_edit, sizeof(app->st_edit), "%s", app->status[i]);
     app->txt = 1;
+    app->txt_v = FlipperHamViewStatus;
 
     text_input_reset(app->text_input);
     text_input_set_header_text(app->text_input, "Status");
@@ -1580,6 +1593,7 @@ static void cl(void* context, uint32_t index)
     }
 
     app->txt = 2;
+    app->txt_v = FlipperHamViewCall;
 
     text_input_reset(app->text_input);
     text_input_set_header_text(app->text_input, "Callsign");
@@ -1608,6 +1622,7 @@ static void cb(void* context, uint32_t index)
 
         app->c_edit[0] = 0;
         app->txt = 4;
+        app->txt_v = FlipperHamViewBook;
         text_input_reset(app->text_input);
         text_input_set_header_text(app->text_input, "Callsign");
         text_input_set_result_callback(app->text_input, csave, app, app->c_edit, sizeof(app->c_edit), false);
@@ -1670,6 +1685,7 @@ static void cx(void* context, InputType input_type, uint32_t index)
     app->edit_call_index = i;
     snprintf(app->c_edit, sizeof(app->c_edit), "%s", app->calls[i]);
     app->txt = 2;
+    app->txt_v = FlipperHamViewCall;
 
     text_input_reset(app->text_input);
     text_input_set_header_text(app->text_input, "Callsign");
@@ -1765,6 +1781,7 @@ static void c2(void* context, uint32_t index)
         app->edit_call_index = app->book_call_index;
         snprintf(app->c_edit, sizeof(app->c_edit), "%s", app->calls[app->book_call_index]);
         app->txt = 4;
+        app->txt_v = FlipperHamViewC2;
         text_input_reset(app->text_input);
         text_input_set_header_text(app->text_input, "Callsign");
         text_input_set_result_callback(app->text_input, csave, app, app->c_edit, sizeof(app->c_edit), false);
@@ -1822,6 +1839,7 @@ static void flipperham_status_view_alloc(FlipperHamApp* app)
 {
     app->view_port = view_port_alloc();
     view_port_draw_callback_set(app->view_port, flipperham_draw_callback, app);
+    view_port_input_callback_set(app->view_port, stin, app);
     gui_add_view_port(app->gui, app->view_port, GuiLayerFullscreen);
 }
 
@@ -1950,9 +1968,23 @@ static void flipperham_menu_free(FlipperHamApp* app)
 }
 
 
+static void stin(InputEvent* event, void* context)
+{
+    FlipperHamApp* app = context;
+
+    if(event->type != InputTypeShort) return;
+    if(event->key != InputKeyBack) return;
+      if(!app->r_w) return;
+
+    app->r_x = true;
+}
+
+
 static void gblink(void)
 {
-    furi_hal_light_set(LightRed | LightGreen, 255);
+    furi_hal_light_set(LightBlue, 0);
+    furi_hal_light_set(LightRed, 255);
+      furi_hal_light_set(LightGreen, 72);
 }
 
 
@@ -1987,6 +2019,8 @@ static FlipperHamApp* flipperham_app_alloc(void)
         app->encoding_index = FlipperHamModemProfileDefault;
         app->repeat_n = 1;
         app->repeat_i = 1;
+        app->r_w = false;
+        app->r_x = false;
         app->tx_msg_index = 0;
         app->tx_t = 0;
         app->status_index = 0;
@@ -2010,6 +2044,7 @@ static FlipperHamApp* flipperham_app_alloc(void)
         app->f_bad = false;
         app->go_v = FlipperHamViewMenu;
         app->txt = 0;
+        app->txt_v = FlipperHamViewMenu;
         app->pkt = malloc(sizeof(Packet));
         app->wave = malloc(sizeof(uint16_t) * 4096);
 
@@ -2102,6 +2137,8 @@ static void flipperham_send_hardcoded_message(FlipperHamApp* app)
     app->repeat_i = 0;
     app->repeat_t0 = furi_get_tick();
     app->repeat_to = 0;
+    app->r_w = false;
+    app->r_x = false;
     app->done_w = false;
     furi_hal_light_set(LightRed | LightGreen, 0);
 
@@ -2118,6 +2155,7 @@ static void flipperham_send_hardcoded_message(FlipperHamApp* app)
         }
         app->tx_started = false;
         app->tx_allowed = true;
+        app->r_w = false;
         app->done_w = false;
 
         view_port_update(app->view_port);
@@ -2144,18 +2182,26 @@ static void flipperham_send_hardcoded_message(FlipperHamApp* app)
         if(i + 1 >= app->repeat_n) break;
 
         app->repeat_to = a[i + 1];
+        app->r_w = true;
         app->tx_done = false;
 
         while(1)
         {
+            if(app->r_x) break;
+
             b = furi_get_tick() - app->repeat_t0;
             if(b >= app->repeat_to) break;
 
             view_port_update(app->view_port);
             furi_delay_ms(50);
         }
+
+        app->r_w = false;
+        if(app->r_x) break;
     }
 
+    app->r_w = false;
+    app->r_x = false;
     app->done_w = true;
     app->tx_done = true;
     view_port_update(app->view_port);
