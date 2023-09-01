@@ -2046,7 +2046,7 @@ static FlipperHamApp* flipperham_app_alloc(void)
         app->txt = 0;
         app->txt_v = FlipperHamViewMenu;
         app->pkt = malloc(sizeof(Packet));
-        app->wave = malloc(sizeof(uint16_t) * 4096);
+        app->wave = malloc(sizeof(uint16_t) * 28672);
 
         cfgload(app);
 

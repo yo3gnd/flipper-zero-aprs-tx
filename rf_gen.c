@@ -107,7 +107,7 @@ static bool wave_add(FlipperHamApp* app, uint16_t value)
     int32_t acc;
 
     if(!app->wave) return false;
-    if(app->wave_len >= 4096) return false;
+    if(app->wave_len >= 28672) return false;
 
     acc = value + app->wave_carry;
     value = (acc + 16) / 33;
@@ -250,24 +250,24 @@ void txstart(FlipperHamApp* app)
 
     n = (50 * p->baud + 500) / 1000;
     if(!n) n = 1;
-    for(i = 0; i < n && wave_put(app, 1); i++);
+    for(i = 0; i < n; i++) if(!wave_put(app, 1)) return;
 
 
     for(i = 0; i < 50; i++)
     {
-        if(!wave_flag(app)) break;
+        if(!wave_flag(app)) return;
     }
 
 
       for(i = 8; i + 8 < app->pkt->stuffed_len; i++)
       {
-          if(!wave_put(app, app->pkt->stuffed[i])) break;
+          if(!wave_put(app, app->pkt->stuffed[i])) return;
       }
 
 
     for(i = 0; i < 3; i++)
     {
-        if(!wave_flag(app)) break;
+        if(!wave_flag(app)) return;
     }
 
     if(!app->wave_len) app->tx_done = true;
