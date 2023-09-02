@@ -25,6 +25,9 @@ typedef struct {
 } FlipperHamModemProfile;
 
 
+#define WAVE_N 28672
+
+
 extern const FlipperHamPreset flipperham_presets[4];
 extern const FlipperHamModemProfile flipperham_modem_profiles[2];
 

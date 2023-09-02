@@ -52,7 +52,7 @@ typedef struct FlipperHamApp
     Packet* pkt;
     uint16_t* wave;
     uint16_t wave_len;
-    int16_t wave_carry;
+    double wave_carry;
     bool wave_is_mark;
     uint32_t repeat_t0;
     uint32_t repeat_to;

@@ -49,8 +49,9 @@ static const FlipperHamPreset* flipperham_preset = &flipperham_presets[FlipperHa
 
 static bool wave_flag(FlipperHamApp* app);
 static bool wave_put(FlipperHamApp* app, uint8_t bit);
-static bool wave_add(FlipperHamApp* app, uint16_t value);
+static bool wave_add(FlipperHamApp* app, double value);
 static LevelDuration edge_yield(void* context);
+static uint16_t d2(double a);
 
 
 FLIPPERHAM_ASYNC_PRESET(flipperham_preset_2fsk_dev5_16khz_async_regs, 0x04, 0x83, 0x67, 0x15)
@@ -102,47 +103,61 @@ uint32_t txf(FlipperHamApp* app)
 }
 
 
-static bool wave_add(FlipperHamApp* app, uint16_t value)
+static bool wave_add(FlipperHamApp* app, double value)
 {
-    int32_t acc;
+    uint16_t a;
 
     if(!app->wave) return false;
-    if(app->wave_len >= 28672) return false;
+    if(app->wave_len >= WAVE_N) return false;
 
-    acc = value + app->wave_carry;
-    value = (acc + 16) / 33;
-    app->wave_carry = acc - ((int32_t)value * 33);
-    if(!value) return true;
+    value += app->wave_carry;
+    a = d2(value);
+    app->wave_carry = value - a;
+    if(!a) return true;
 
-    app->wave[app->wave_len++] = value;
+    app->wave[app->wave_len++] = a;
     return true;
+}
+
+static uint16_t d2(double a)
+{
+    uint16_t q;
+    double r;
+
+    q = (uint16_t)a;
+    r = a - q;
+
+      if(r > (double)0.5f) q++;
+      else if(r >= (double)0.5f - (double)0.000001f) if(q & 1) q++;
+
+    return q;
 }
 
 
     static bool wave_put(FlipperHamApp* app, uint8_t bit)
     {
         const FlipperHamModemProfile* p;
-        uint32_t b;
-        uint32_t h;
-        uint32_t r;
+        double b;
+        double h;
+        double a;
 
         p = &flipperham_modem_profiles[app->encoding_index];
-        b = (33000000UL + (p->baud / 2)) / p->baud;
+        b = 1000000.0 / p->baud;
 
         if(bit == 0) app->wave_is_mark = !app->wave_is_mark;
 
-        if(app->wave_is_mark) h = (16500000UL + (p->mark_hz / 2)) / p->mark_hz;
-        else h = (16500000UL + (p->space_hz / 2)) / p->space_hz;
+        if(app->wave_is_mark) h = 1000000.0 / (2.0 * p->mark_hz);
+        else h = 1000000.0 / (2.0 * p->space_hz);
 
-        r = b;
+        a = 0.0;
 
-        while(r > h)
+        while(a + h < b - (double)0.000001f)
         {
             if(!wave_add(app, h)) return false;
-            r -= h;
+            a += h;
         }
 
-        if(r) if(!wave_add(app, r)) return false;
+        if(!wave_add(app, b - a)) return false;
 
         return true;
     }
