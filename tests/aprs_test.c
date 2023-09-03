@@ -27,9 +27,23 @@ int main(void)
     if(aprs_lon(b, sizeof(b), "26.09778") == 9 && !strcmp(b, "02605.87E")) { ok++; printf("ok lon 2\n"); }
     else { bad++; printf("bad lon 2 got=%s\n", b); }
 
+    /* bucuresti <3 */
+    printf("== pos lat 3 ==\n");
+    if(aprs_lat(a, sizeof(a), "44.437461") == 8 && !strcmp(a, "4426.25N")) { ok++; printf("ok lat 3\n"); }
+      else { bad++; printf("bad lat 3 got=%s\n", a); }
+
+
+    printf("== pos lon 3 ==\n");
+    if(aprs_lon(b, sizeof(b), "26.090215") == 9 && !strcmp(b, "02605.41E")) { ok++; printf("ok lon 3\n"); }
+      else { bad++; printf("bad lon 3 got=%s\n", b); }
+
     printf("== pos full ==\n");
     if(aprs_pos(c, sizeof(c), "Null Island", "0.02", "-0.04") == 31 && !strcmp(c, "!0001.20N/00002.40W-Null Island")) { ok++; printf("ok pos full\n"); }
     else { bad++; printf("bad pos full got=%s\n", c); }
+
+    printf("== pos full 2 ==\n");
+    if(aprs_pos(c, sizeof(c), "Cismigiu Park", "44.437461", "26.090215") == 33 && !strcmp(c, "!4426.25N/02605.41E-Cismigiu Park")) { ok++; printf("ok bucuresti\n"); }
+      else { bad++; printf("bad pos full 2 got=%s\n", c); }
 
     printf("== clamp lat ==\n");
     if(aprs_ll_clamp(a, sizeof(a), "123.45", 0) > 0 && !strcmp(a, "90.00000")) { ok++; printf("ok clamp lat\n"); }

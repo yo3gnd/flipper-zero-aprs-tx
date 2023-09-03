@@ -77,9 +77,12 @@ static void cfgdefs(FlipperHamApp* app)
     snprintf(app->status[0], sizeof(app->status[0]), "flipper status");
     snprintf(app->calls[0], sizeof(app->calls[0]), "FL1PER");
     snprintf(app->calls[1], sizeof(app->calls[1]), "YO3GND-12");
-    snprintf(app->pos_name[0], sizeof(app->pos_name[0]), "Null Island");
-    snprintf(app->pos_lat[0], sizeof(app->pos_lat[0]), "0.02");
-    snprintf(app->pos_lon[0], sizeof(app->pos_lon[0]), "-0.04");
+    snprintf(app->pos_name[0], sizeof(app->pos_name[0]), "Cismigiu Park");
+    snprintf(app->pos_lat[0], sizeof(app->pos_lat[0]), "44.437461");
+    snprintf(app->pos_lon[0], sizeof(app->pos_lon[0]), "26.090215");
+    snprintf(app->pos_name[1], sizeof(app->pos_name[1]), "Null Island");
+    snprintf(app->pos_lat[1], sizeof(app->pos_lat[1]), "0.02");
+    snprintf(app->pos_lon[1], sizeof(app->pos_lon[1]), "-0.04");
 
         snprintf(app->message[0], sizeof(app->message[0]), "Hello from Flipper Zero! :D");
 
@@ -89,12 +92,13 @@ static void cfgdefs(FlipperHamApp* app)
         app->calls_used[0] = 1;
         app->calls_used[1] = 1;
         app->pos_used[0] = 1;
+        app->pos_used[1] = 1;
 
         app->bulletin_n = 1;
         app->status_n = 1;
         app->message_n = 1;
         app->calls_n = 2;
-        app->pos_n = 1;
+        app->pos_n = 2;
         app->freq[0] = CARRIER_HZ;
         app->freq_used[0] = 1;
         app->freq_n = 1;

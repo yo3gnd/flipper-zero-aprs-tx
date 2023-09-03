@@ -2177,10 +2177,10 @@ static void flipperham_send_hardcoded_message(FlipperHamApp* app)
         app->r_w = false;
         app->done_w = false;
 
+        gblink();
         view_port_update(app->view_port);
         furi_delay_ms(100);
 
-        gblink();
         flipperham_radio_start(app);
 
         while(!app->tx_done) {
