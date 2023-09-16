@@ -11,6 +11,8 @@ static void mx0(void* context, uint32_t index);
 static void px0(void* context, uint32_t index);
 #include <furi_hal.h>
 #include <gui/view.h>
+#include <notification/notification.h>
+#include <notification/notification_messages.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -95,6 +97,9 @@ static bool fin(const char* s, uint32_t* out);
 
 
 static void flipperham_draw_callback(Canvas* canvas, void* context);
+static void hdraw(Canvas* canvas, void* context);
+static void hin(InputEvent* event, void* context);
+static void hmorse(FlipperHamApp* app);
 static void stin(InputEvent* event, void* context);
 static void flipperham_status_view_alloc(FlipperHamApp* app);
 static void flipperham_status_view_free(FlipperHamApp* app);
@@ -163,6 +168,89 @@ static void flipperham_draw_callback(Canvas* canvas, void* context)
         w = (n * 80UL) / m;
         if(w) canvas_draw_box(canvas, 24, 32, w, 3);
     }
+}
+
+static void hdraw(Canvas* canvas, void* context)
+{
+    UNUSED(context);
+    canvas_clear(canvas);
+}
+
+static void hin(InputEvent* event, void* context)
+{
+    UNUSED(event);
+    UNUSED(context);
+}
+
+static void hmorse(FlipperHamApp* app)
+{
+    static const char* a = "73 DE YO3GND";
+    ViewPort* v;
+    NotificationApp* n;
+    const char* p;
+    uint32_t d;
+    uint8_t i, j;
+
+    v = view_port_alloc();
+    view_port_draw_callback_set(v, hdraw, app);
+    view_port_input_callback_set(v, hin, app);
+    gui_add_view_port(app->gui, v, GuiLayerFullscreen);
+    view_port_update(v);
+
+    n = furi_record_open(RECORD_NOTIFICATION);
+    furi_hal_light_blink_stop();
+    furi_hal_light_set(LightRed, 0);
+    furi_hal_light_set(LightGreen, 0);
+    furi_hal_light_set(LightBlue, 0);
+    notification_message(n, &sequence_display_backlight_off);
+    notification_message(n, &sequence_reset_rgb);
+    furi_delay_ms(1000);
+
+    if(!furi_hal_speaker_acquire(1000)) goto x;
+
+    for(i = 0; a[i]; i++)
+    {
+        p = NULL;
+        switch(a[i])
+        {
+        case '7': p = "--..."; break;
+        case '3': p = "...--"; break;
+        case 'D': p = "-.."; break;
+        case 'E': p = "."; break;
+        case 'Y': p = "-.--"; break;
+        case 'O': p = "---"; break;
+        case 'G': p = "--."; break;
+        case 'N': p = "-."; break;
+        case ' ': break;
+        default: break;
+        }
+
+        if(!p) continue;
+
+        for(j = 0; p[j]; j++)
+        {
+            d = (p[j] == '-') ? 180 : 60;
+            notification_message(n, &sequence_display_backlight_on);
+            furi_hal_speaker_start(880.0f, 0.7f);
+            furi_delay_ms(d);
+            furi_hal_speaker_stop();
+            notification_message(n, &sequence_display_backlight_off);
+            if(p[j + 1]) furi_delay_ms(60);
+        }
+
+        if(!a[i + 1]) continue;
+        if(a[i + 1] == ' ') furi_delay_ms(420);
+        else furi_delay_ms(180);
+    }
+
+    furi_hal_speaker_release();
+
+x:
+    notification_message(n, &sequence_display_backlight_enforce_auto);
+    notification_message(n, &sequence_display_backlight_on);
+    furi_record_close(RECORD_NOTIFICATION);
+    gui_remove_view_port(app->gui, v);
+    view_port_free(v);
 }
 
 
@@ -998,6 +1086,14 @@ static void hre(void* context, uint32_t index)
         app->ham_tx_index = app->ham_index;
         htmenu(app);
         view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewHamTx);
+        return;
+    }
+
+    if(index == 1)
+    {
+        hmorse(app);
+        hmenu(app);
+        view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewHam);
         return;
     }
 }
