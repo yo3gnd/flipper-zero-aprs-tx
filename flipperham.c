@@ -382,6 +382,44 @@ static void hloadtxt(FlipperHamApp* app)
     if(app->ham_tx_index >= app->ham_n) app->ham_tx_index = 0;
 }
 
+void hsavetxt(FlipperHamApp* app)
+{
+    Storage* storage;
+    File* file;
+    uint8_t i;
+    char a[48];
+    int n;
+
+    storage = furi_record_open(RECORD_STORAGE);
+    file = storage_file_alloc(storage);
+
+    if(!storage_file_open(file, MY_CALLS_FILE, FSAM_WRITE, FSOM_OPEN_EXISTING))
+    {
+        storage_file_free(file);
+        furi_record_close(RECORD_STORAGE);
+        return;
+    }
+
+    storage_file_seek(file, 0, true);
+    storage_file_truncate(file);
+
+    for(i = 0; i < app->ham_n; i++)
+    {
+        if(!app->ham_calls[i][0]) continue;
+
+        if(app->ham_has_ssid[i])
+            n = snprintf(a, sizeof(a), "%s-%u,%u\n", app->ham_calls[i], app->ham_ssid[i], app->ham_pass[i]);
+        else
+            n = snprintf(a, sizeof(a), "%s,%u\n", app->ham_calls[i], app->ham_pass[i]);
+
+        if(n > 0) storage_file_write(file, a, n);
+    }
+
+    storage_file_close(file);
+    storage_file_free(file);
+    furi_record_close(RECORD_STORAGE);
+}
+
 void cfgload(FlipperHamApp* app)
 {
     Storage* storage;

@@ -7,6 +7,7 @@
 void cfgsave(FlipperHamApp* app);
 void cfgload(FlipperHamApp* app);
 void csavetxt(FlipperHamApp* app);
+void hsavetxt(FlipperHamApp* app);
 
 
 bool csplit(const char* s, char* out, uint8_t* ssid, bool* has_ssid);

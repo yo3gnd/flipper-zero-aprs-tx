@@ -809,6 +809,7 @@ static void smenu(FlipperHamApp* app)
 static void hmenu(FlipperHamApp* app)
 {
     VariableItem* it;
+    char a[16];
 
     variable_item_list_reset(app->ham_menu);
     if(!app->ham_n) return;
@@ -816,7 +817,11 @@ static void hmenu(FlipperHamApp* app)
 
     it = variable_item_list_add(app->ham_menu, "Callsign", app->ham_n, hc, app);
     variable_item_set_current_value_index(it, app->ham_index);
-    variable_item_set_current_value_text(it, app->ham_calls[app->ham_index]);
+    if(app->ham_has_ssid[app->ham_index])
+        snprintf(a, sizeof(a), "%s-%u", app->ham_calls[app->ham_index], app->ham_ssid[app->ham_index]);
+    else
+        snprintf(a, sizeof(a), "%s", app->ham_calls[app->ham_index]);
+    variable_item_set_current_value_text(it, a);
 
     variable_item_list_add(app->ham_menu, "73 de YO3GND", 1, NULL, NULL);
     variable_item_list_set_selected_item(app->ham_menu, app->h_sel);
@@ -964,10 +969,15 @@ static void sc(VariableItem* item)
 static void hc(VariableItem* item)
 {
     FlipperHamApp* app = variable_item_get_context(item);
+    char a[16];
 
     app->ham_index = variable_item_get_current_value_index(item);
     if(app->ham_n) if(app->ham_index >= app->ham_n) app->ham_index = 0;
-    variable_item_set_current_value_text(item, app->ham_calls[app->ham_index]);
+    if(app->ham_has_ssid[app->ham_index])
+        snprintf(a, sizeof(a), "%s-%u", app->ham_calls[app->ham_index], app->ham_ssid[app->ham_index]);
+    else
+        snprintf(a, sizeof(a), "%s", app->ham_calls[app->ham_index]);
+    variable_item_set_current_value_text(item, a);
 }
 
 static void hsc(VariableItem* item)
@@ -976,8 +986,10 @@ static void hsc(VariableItem* item)
     char a[4];
 
     app->ham_ssid[app->ham_tx_index] = variable_item_get_current_value_index(item);
+    app->ham_has_ssid[app->ham_tx_index] = true;
     snprintf(a, sizeof(a), "%u", app->ham_ssid[app->ham_tx_index]);
     variable_item_set_current_value_text(item, a);
+    hsavetxt(app);
 }
 
 static void bc(VariableItem* item)
@@ -1106,6 +1118,7 @@ static void hte(void* context, uint32_t index)
     if(index == 1)
     {
         app->ham_index = app->ham_tx_index;
+        hsavetxt(app);
         hmenu(app);
         view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewHam);
         return;
