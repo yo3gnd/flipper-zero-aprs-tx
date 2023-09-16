@@ -105,3 +105,46 @@ int aprs_pos(char* out, uint16_t n, const char* name, const char* lat, const cha
     if(aprs_lon(b, sizeof(b), lon) <= 0) return 0;
     return snprintf(out, n, "!%s/%s-%s", a, b, name ? name : "");
 }
+
+uint16_t aprs_passcode(const char* s)
+{
+    char a[7];
+    uint16_t h;
+    uint8_t i;
+    char c;
+
+    if(!s) return 0;
+
+    i = 0;
+    while(*s)
+    {
+        if(*s == '-') break;
+        if(i >= sizeof(a) - 1) break;
+        c = *s++;
+        if(c >= 'a' && c <= 'z') c -= 32;
+        a[i++] = c;
+    }
+    a[i] = 0;
+    if(!a[0]) return 0;
+
+    h = 0x73e2;
+    i = 0;
+    while(a[i])
+    {
+        h ^= ((uint16_t)a[i]) << 8;
+        if(a[i + 1]) h ^= (uint8_t)a[i + 1];
+        i += 2;
+    }
+
+    return h & 0x7fff;
+}
+
+int aprs_pass_validate(const char* s, uint16_t p)
+{
+    uint16_t a;
+
+    a = aprs_passcode(s);
+    if(!a) return 0;
+    if(a != p) return 0;
+    return 1;
+}
