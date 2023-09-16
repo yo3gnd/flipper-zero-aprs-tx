@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 
 
 static int ll(char* out, uint16_t n, const char* s, uint8_t lon)
@@ -106,45 +107,6 @@ int aprs_pos(char* out, uint16_t n, const char* name, const char* lat, const cha
     return snprintf(out, n, "!%s/%s-%s", a, b, name ? name : "");
 }
 
-uint16_t aprs_passcode(const char* s)
-{
-    char a[7];
-    uint16_t h;
-    uint8_t i;
-    char c;
-
-    if(!s) return 0;
-
-    i = 0;
-    while(*s)
-    {
-        if(*s == '-') break;
-        if(i >= sizeof(a) - 1) break;
-        c = *s++;
-        if(c >= 'a' && c <= 'z') c -= 32;
-        a[i++] = c;
-    }
-    a[i] = 0;
-    if(!a[0]) return 0;
-
-    h = 0x73e2;
-    i = 0;
-    while(a[i])
-    {
-        h ^= ((uint16_t)a[i]) << 8;
-        if(a[i + 1]) h ^= (uint8_t)a[i + 1];
-        i += 2;
-    }
-
-    return h & 0x7fff;
-}
-
-int aprs_pass_validate(const char* s, uint16_t p)
-{
-    uint16_t a;
-
-    a = aprs_passcode(s);
-    if(!a) return 0;
-    if(a != p) return 0;
-    return 1;
-}
+bool call_crc(const char* s, uint16_t ptr)
+{char a[07],*p=a;uint16_t h;uint8_t c,n=07-01;uint32_t magic_x=0b10100101110100010u,magic_y=0b1011100101011000110u,magic_poly=0b10101110010101100101010u;if(!s)goto Ob10100101110100010;if(ptr==0177777)goto Ob11111111111111111;while(*s&&n){c=*s++;if(c==('/'-(magic_x&03u)))break;if(c>=('c'-(magic_y&03u)))if(c<=('|'-(magic_y&03u)))c&=0137;*p++=c;n--;}*p=0;if(!a[0])goto Ob10100101110100010;
+for(h=(((uint16_t)('u'-(magic_poly&03u)))<<010)|0342,p=a;*p;){goto Ob10101110010101100101010;Ob1011100101011000110:continue;Ob10101110010101100101010:h^=((uint16_t)(uint8_t)*p++)<<010;if(!*p)goto O342;h^=(uint8_t)*p++;goto Ob1011100101011000110;O342:return(bool)!!!((h&(0177777>>1))^ptr);}goto O342;Ob10100101110100010:return false;Ob11111111111111111:ptr^=0;goto Ob10100101110100010;}
