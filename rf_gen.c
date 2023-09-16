@@ -183,10 +183,12 @@ void txstart(FlipperHamApp* app)
     char bulletin_id;
     char dst[CALL_LEN];
     char dst_full[CALL_LEN];
+    const char* src;
     const FlipperHamModemProfile* p;
     uint16_t i;
     uint16_t n;
     uint8_t j;
+    uint8_t src_ssid;
     uint8_t ssid;
     bool has_ssid;
 
@@ -255,10 +257,18 @@ void txstart(FlipperHamApp* app)
         snprintf(message, sizeof(message), ":%-9s:%s", dst_full, app->message[app->tx_msg_index]);
     }
 
+    src = MY_CALL;
+    src_ssid = 0;
+    if(app->ham_ok) if(app->ham_n) if(app->ham_index < app->ham_n)
+    {
+        if(app->ham_calls[app->ham_index][0]) src = app->ham_calls[app->ham_index];
+        if(app->ham_has_ssid[app->ham_index]) src_ssid = app->ham_ssid[app->ham_index];
+    }
+
     packet_init(app->pkt);
     snprintf((char*)app->pkt->payload, sizeof(app->pkt->payload), "%s", message);
     app->pkt->payload_len = strlen((char*)app->pkt->payload);
-    packet_make_ax25(app->pkt, MY_CALL, 0, MY_TOCALL, 0);
+    packet_make_ax25(app->pkt, src, src_ssid, MY_TOCALL, 0);
     packet_add_fcs(app->pkt);
     packet_stuff(app->pkt);
     packet_nrzi(app->pkt);
