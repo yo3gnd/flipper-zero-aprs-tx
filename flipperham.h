@@ -10,10 +10,12 @@
 #define MY_CALL       "FL1PER"
 #define CARRIER_HZ    433250000UL
 #define FREQ_N        4
+#define HAM_N         8
 #define POS_LEN       16
 
 #define CFG_DIR       "/ext/apps_data/aprstx"
 #define CALLBOOK_FILE "/ham/callbook.txt"
+#define MY_CALLS_FILE "/ham/my-callsigns.txt"
 #define TXT_N         16
 #define MY_TOCALL     "APZFLP"
 #define CALLBOOK_DIR  "/ham"
@@ -70,6 +72,8 @@ enum
     FlipperHamViewFreq,
     FlipperHamViewFreqEdit,
     FlipperHamViewPosEdit,
+    FlipperHamViewHam,
+    FlipperHamViewHamTx,
 };
 
 
@@ -78,6 +82,7 @@ enum
     FlipperHamMenuIndexSend = 0,
     FlipperHamMenuIndexSettings,
     FlipperHamMenuIndexCallbook,
+    FlipperHamMenuIndexHam,
 };
 
 

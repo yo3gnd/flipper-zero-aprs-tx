@@ -29,6 +29,8 @@ typedef struct FlipperHamApp
     Submenu* c2_menu;
     Submenu* freq_menu;
     VariableItemList* settings_menu;
+    VariableItemList* ham_menu;
+    VariableItemList* ham_tx_menu;
     VariableItemList* ssid_menu;
     VariableItemList* freq_edit_menu;
     VariableItemList* pos_edit_menu;
@@ -42,6 +44,7 @@ typedef struct FlipperHamApp
     bool tx_ok;
     bool done_w;
     bool send_requested;
+    bool ham_ok;
     uint8_t encoding_index;
     uint8_t rf_m;
     uint8_t rf_d;
@@ -61,6 +64,7 @@ typedef struct FlipperHamApp
     char status[TXT_N][TXT_LEN];
     char message[TXT_N][TXT_LEN];
     char calls[CALL_N][CALL_LEN];
+    char ham_calls[HAM_N][CALL_LEN];
     char pos_name[TXT_N][TXT_LEN];
     char pos_lat[TXT_N][POS_LEN];
     char pos_lon[TXT_N][POS_LEN];
@@ -71,10 +75,14 @@ typedef struct FlipperHamApp
     uint8_t calls_used[CALL_N];
     uint8_t pos_used[TXT_N];
     uint8_t freq_used[FREQ_N];
+    uint8_t ham_ssid[HAM_N];
+    bool ham_has_ssid[HAM_N];
+    uint16_t ham_pass[HAM_N];
     uint8_t bulletin_n;
     uint8_t status_n;
     uint8_t message_n;
     uint8_t calls_n;
+    uint8_t ham_n;
     uint8_t pos_n;
     uint8_t freq_n;
     uint8_t tx_freq_index;
@@ -89,6 +97,8 @@ typedef struct FlipperHamApp
     uint8_t d_s;
     uint8_t edit_call_index;
     uint8_t book_call_index;
+    uint8_t ham_index;
+    uint8_t ham_tx_index;
     uint8_t freq_index;
     uint16_t b_sel;
     uint16_t st_sel;
@@ -98,6 +108,8 @@ typedef struct FlipperHamApp
       uint16_t bk_sel;
     uint16_t c2_sel;
     uint16_t f_sel;
+    uint16_t h_sel;
+    uint16_t ht_sel;
     uint8_t txt;
     uint8_t txt_v;
     char b_edit[TXT_LEN];
