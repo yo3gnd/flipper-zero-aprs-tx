@@ -109,6 +109,8 @@ static void flipperham_app_free(FlipperHamApp* app);
 static void flipperham_send_hardcoded_message(FlipperHamApp* app);
 static void flipperham_menu_callback(void* context, uint32_t index);
 static void flipperham_send_callback(void* context, uint32_t index);
+
+static FlipperHamApp* gapp;
 static bool cpy(FlipperHamApp* app);
 static void gblink(void);
 static uint32_t rt4(FlipperHamApp* app);
@@ -370,8 +372,10 @@ static uint32_t flipperham_ssid_exit_callback(void* context)
 
 static uint32_t flipperham_call_exit_callback(void* context)
 {
-    FlipperHamApp* app = context;
+    FlipperHamApp* app = gapp;
 
+    UNUSED(context);
+    if(!app) return FlipperHamViewSend;
     if(app->tx_t == 2) return FlipperHamViewMessage;
     return FlipperHamViewSend;
 }
@@ -427,8 +431,10 @@ static uint32_t c2x(void* context)
 
 static uint32_t flipperham_text_exit_callback(void* context)
 {
-    FlipperHamApp* app = context;
+    FlipperHamApp* app = gapp;
 
+    UNUSED(context);
+    if(!app) return FlipperHamViewMenu;
     return app->txt_v;
 }
 
@@ -531,6 +537,8 @@ static void stmenu(FlipperHamApp* app)
         uint8_t i;
 
         submenu_reset(app->call_menu);
+        if(app->tx_t == 2) submenu_set_header(app->call_menu, "Destination:");
+        else submenu_set_header(app->call_menu, NULL);
         submenu_add_item( app->call_menu, "Add new callsign...", FlipperHamCallIndexAdd, cl, app);
 
         for(i = 0; i < CALL_N; i++)
@@ -2229,6 +2237,7 @@ static FlipperHamApp* flipperham_app_alloc(void)
 {
     FlipperHamApp* app = malloc(sizeof(FlipperHamApp));
 
+    gapp = app;
     app->gui = furi_record_open(RECORD_GUI);
     app->view_dispatcher = view_dispatcher_alloc();
     app->submenu = submenu_alloc();
@@ -2377,6 +2386,7 @@ static void flipperham_app_free(FlipperHamApp* app)
 {
     if(!app) return;
 
+    if(gapp == app) gapp = NULL;
     flipperham_status_view_free(app);
     flipperham_menu_free(app);
     if(app->pkt) free(app->pkt);

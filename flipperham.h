@@ -14,11 +14,11 @@
 #define POS_LEN       16
 
 #define CFG_DIR       "/ext/apps_data/aprstx"
-#define CALLBOOK_FILE "/ham/callbook.txt"
-#define MY_CALLS_FILE "/ham/my-callsigns.txt"
+#define CALLBOOK_FILE "/ext/ham/callbook.txt"
+#define MY_CALLS_FILE "/ext/ham/my-callsigns.txt"
 #define TXT_N         16
 #define MY_TOCALL     "APZFLP"
-#define CALLBOOK_DIR  "/ham"
+#define CALLBOOK_DIR  "/ext/ham"
 #define CALL_LEN      10
 
 typedef struct
