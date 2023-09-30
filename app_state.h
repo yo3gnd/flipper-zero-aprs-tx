@@ -49,6 +49,7 @@ typedef struct FlipperHamApp
     uint8_t rf_m;
     uint8_t rf_d;
     uint8_t repeat_n;
+    uint16_t preamble_ms;
     uint8_t repeat_i;
     bool r_w;
     bool r_x;

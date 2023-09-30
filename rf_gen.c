@@ -273,9 +273,12 @@ void txstart(FlipperHamApp* app)
     packet_stuff(app->pkt);
     packet_nrzi(app->pkt);
 
-    n = (50 * p->baud + 500) / 1000;
-    if(!n) n = 1;
-    for(i = 0; i < n; i++) if(!wave_put(app, 1)) return;
+    n = (app->preamble_ms * p->baud + 500) / 1000;
+    if(app->preamble_ms)
+    {
+        if(!n) n = 1;
+        for(i = 0; i < n; i++) if(!wave_put(app, 1)) return;
+    }
 
 
     for(i = 0; i < 50; i++)
