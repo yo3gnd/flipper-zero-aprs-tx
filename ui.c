@@ -875,9 +875,11 @@ static void rmenu(FlipperHamApp* app)
     variable_item_set_current_value_index(it, app->rf_m);
     variable_item_set_current_value_text(it, app->rf_m ? "GFSK" : "2FSK");
 
-    it = variable_item_list_add(app->settings_menu, "Deviation", 2, dc, app);
+    it = variable_item_list_add(app->settings_menu, "Deviation", 3, dc, app);
     variable_item_set_current_value_index(it, app->rf_d);
-    variable_item_set_current_value_text(it, app->rf_d ? "5.0" : "2.5");
+    if(app->rf_d == 0) variable_item_set_current_value_text(it, "2.5");
+    else if(app->rf_d == 1) variable_item_set_current_value_text(it, "3.0");
+    else variable_item_set_current_value_text(it, "5.0");
 
     it = variable_item_list_add(app->settings_menu, "Repeat TX", 5, rc, app);
     variable_item_set_current_value_index(it, app->repeat_n - 1);
@@ -1035,9 +1037,11 @@ static void dc(VariableItem* item)
     FlipperHamApp* app = variable_item_get_context(item);
 
     app->rf_d = variable_item_get_current_value_index(item);
-    if(app->rf_d > 1) app->rf_d = 1;
+    if(app->rf_d > 2) app->rf_d = 2;
 
-    variable_item_set_current_value_text(item, app->rf_d ? "5.0" : "2.5");
+    if(app->rf_d == 0) variable_item_set_current_value_text(item, "2.5");
+    else if(app->rf_d == 1) variable_item_set_current_value_text(item, "3.0");
+    else variable_item_set_current_value_text(item, "5.0");
     pf(app);
     cfgsave(app);
 }

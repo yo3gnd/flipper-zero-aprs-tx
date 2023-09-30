@@ -68,7 +68,7 @@ static void cfgdefs(FlipperHamApp* app)
     app->freq_n = 0;
 
     app->encoding_index = FlipperHamModemProfileDefault;
-    app->rf_m = 0; app->rf_d = 1;
+    app->rf_m = 0; app->rf_d = 2;
     app->tx_freq_index = 0;
     app->d_s = 0;
     app->repeat_n = 1;
