@@ -2326,8 +2326,8 @@ static FlipperHamApp* flipperham_app_alloc(void)
         app->go_v = FlipperHamViewMenu;
         app->txt = 0;
         app->txt_v = FlipperHamViewMenu;
-        app->pkt = malloc(sizeof(Packet));
-        app->wave = malloc(sizeof(uint16_t) * WAVE_N);
+        app->pkt = NULL;
+        app->wave = NULL;
 
         cfgload(app);
 
@@ -2424,6 +2424,21 @@ static void flipperham_send_hardcoded_message(FlipperHamApp* app)
     uint8_t i;
     uint32_t b, c;
 
+    if(!app->pkt) app->pkt = malloc(sizeof(Packet));
+    if(!app->wave) app->wave = malloc(sizeof(uint16_t) * WAVE_N);
+    if(!app->pkt || !app->wave)
+    {
+        if(app->pkt) {
+            free(app->pkt);
+            app->pkt = NULL;
+        }
+        if(app->wave) {
+            free(app->wave);
+            app->wave = NULL;
+        }
+        return;
+    }
+
     flipperham_status_view_alloc(app);
     app->repeat_i = 0;
     app->repeat_t0 = furi_get_tick();
@@ -2451,6 +2466,10 @@ static void flipperham_send_hardcoded_message(FlipperHamApp* app)
             furi_hal_light_set(LightRed, 0);
             furi_hal_light_set(LightGreen, 0);
             flipperham_status_view_free(app);
+            free(app->pkt);
+            free(app->wave);
+            app->pkt = NULL;
+            app->wave = NULL;
             return;
         }
         app->tx_started = false;
@@ -2514,6 +2533,10 @@ static void flipperham_send_hardcoded_message(FlipperHamApp* app)
     furi_hal_light_set(LightGreen, 0);
 
     flipperham_status_view_free(app);
+    free(app->pkt);
+    free(app->wave);
+    app->pkt = NULL;
+    app->wave = NULL;
 }
 
 
