@@ -57,6 +57,11 @@ typedef struct FlipperHamApp
     uint16_t* wave;
     uint16_t wave_len;
     double wave_carry;
+    double pre_b;
+    double pre_h;
+    double pre_c;
+    double pre_a;
+    uint32_t pre_us;
     bool wave_is_mark;
     uint32_t repeat_t0;
     uint32_t repeat_to;
