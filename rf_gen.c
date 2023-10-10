@@ -287,11 +287,7 @@ void txstart(FlipperHamApp* app)
         app->pre_b = 1000000.0 / flipperham_modem_profiles[app->encoding_index].baud;
     }
 
-
-    for(i = 0; i < 50; i++)
-    {
-        if(!wave_flag(app)) return;
-    }
+    if(!wave_flag(app)) return;
 
 
       for(i = 8; i + 8 < app->pkt->stuffed_len; i++)
