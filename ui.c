@@ -1000,6 +1000,7 @@ static void hc(VariableItem* item)
     else
         snprintf(a, sizeof(a), "%s", app->ham_calls[app->ham_index]);
     variable_item_set_current_value_text(item, a);
+    if(app->ham_ok) if(app->ham_n > 1) cfgsave(app);
 }
 
 static void hsc(VariableItem* item)
@@ -1167,6 +1168,7 @@ static void hte(void* context, uint32_t index)
     {
         app->ham_index = app->ham_tx_index;
         hsavetxt(app);
+        cfgsave(app);
         hmenu(app);
         view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewHam);
         return;

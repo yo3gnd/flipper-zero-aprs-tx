@@ -125,6 +125,7 @@ void cfgsave(FlipperHamApp* app)
     c->tx_freq_index = app->tx_freq_index;
     c->d_s = app->d_s;
     c->repeat_n = app->repeat_n;
+    c->ham_index = app->ham_index;
     c->leadin_ms = app->leadin_ms;
     c->preamble_ms = app->preamble_ms;
 
@@ -475,6 +476,7 @@ void cfgload(FlipperHamApp* app)
     app->tx_freq_index = c->tx_freq_index;
     app->d_s = c->d_s;
     app->repeat_n = c->repeat_n;
+    app->ham_index = c->ham_index;
     app->leadin_ms = c->leadin_ms;
     app->preamble_ms = c->preamble_ms;
 
