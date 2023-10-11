@@ -78,6 +78,7 @@ static void bc(VariableItem* item);
 static void pc(VariableItem* item);
 static void dc(VariableItem* item);
 static void rc(VariableItem* item);
+static void lrc(VariableItem* item);
 static void prc(VariableItem* item);
 static void hc(VariableItem* item);
 static void hsc(VariableItem* item);
@@ -886,8 +887,13 @@ static void rmenu(FlipperHamApp* app)
     snprintf(a, sizeof(a), "%u", app->repeat_n);
     variable_item_set_current_value_text(it, a);
 
+    it = variable_item_list_add(app->settings_menu, "Lead-in (ms)", 21, lrc, app);
+    variable_item_set_current_value_index(it, app->leadin_ms / 50);
+    snprintf(a, sizeof(a), "%u", app->leadin_ms);
+    variable_item_set_current_value_text(it, a);
+
     it = variable_item_list_add(app->settings_menu, "Preamble (ms)", 21, prc, app);
-    variable_item_set_current_value_index(it, app->preamble_ms / 25);
+    variable_item_set_current_value_index(it, app->preamble_ms / 50);
     snprintf(a, sizeof(a), "%u", app->preamble_ms);
     variable_item_set_current_value_text(it, a);
 }
@@ -1058,13 +1064,25 @@ static void rc(VariableItem* item)
     cfgsave(app);
 }
 
+static void lrc(VariableItem* item)
+{
+    FlipperHamApp* app = variable_item_get_context(item);
+    char a[8];
+
+    app->leadin_ms = variable_item_get_current_value_index(item) * 50;
+    if(app->leadin_ms > 1000) app->leadin_ms = 1000;
+    snprintf(a, sizeof(a), "%u", app->leadin_ms);
+    variable_item_set_current_value_text(item, a);
+    cfgsave(app);
+}
+
 static void prc(VariableItem* item)
 {
     FlipperHamApp* app = variable_item_get_context(item);
     char a[8];
 
-    app->preamble_ms = variable_item_get_current_value_index(item) * 25;
-    if(app->preamble_ms > 500) app->preamble_ms = 500;
+    app->preamble_ms = variable_item_get_current_value_index(item) * 50;
+    if(app->preamble_ms > 1000) app->preamble_ms = 1000;
     snprintf(a, sizeof(a), "%u", app->preamble_ms);
     variable_item_set_current_value_text(item, a);
     cfgsave(app);
@@ -2290,7 +2308,8 @@ static FlipperHamApp* flipperham_app_alloc(void)
         app->encoding_index = FlipperHamModemProfileDefault;
         app->ham_n = 0;
         app->repeat_n = 1;
-        app->preamble_ms = 50;
+        app->leadin_ms = 50;
+        app->preamble_ms = 350;
         app->repeat_i = 1;
         app->r_w = false;
         app->r_x = false;

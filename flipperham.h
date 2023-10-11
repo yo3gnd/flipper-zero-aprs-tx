@@ -29,6 +29,7 @@ typedef struct
     uint8_t tx_freq_index;
     uint8_t d_s;
     uint8_t repeat_n;
+    uint16_t leadin_ms;
     uint16_t preamble_ms;
 
     char bulletin[TXT_N][TXT_LEN];

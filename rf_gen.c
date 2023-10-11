@@ -154,15 +154,31 @@ static uint16_t d2(double a)
         if(app->wave_is_mark) h = 1000000.0 / (2.0 * p->mark_hz);
         else h = 1000000.0 / (2.0 * p->space_hz);
 
-        a = 0.0;
-
-        while(a + h < b - (double)0.000001f)
+        if(app->wave_prev_h <= (double)0.000001f)
         {
-            if(!wave_add(app, h)) return false;
-            a += h;
+            app->wave_prev_h = h;
+            app->wave_pending = 0;
+            app->wave_osc_remain = h;
+        }
+        else if(h < app->wave_prev_h - (double)0.000001f || h > app->wave_prev_h + (double)0.000001f)
+        {
+            b -= app->wave_osc_remain;
+            if(!wave_add(app, app->wave_prev_h)) return false;
+            app->wave_prev_h = h;
+            app->wave_pending = 0;
+            app->wave_osc_remain = h;
         }
 
-        if(!wave_add(app, b - a)) return false;
+        a = app->wave_pending + b;
+
+        while(a >= app->wave_prev_h - (double)0.000001f)
+        {
+            if(!wave_add(app, app->wave_prev_h)) return false;
+            a -= app->wave_prev_h;
+        }
+
+        app->wave_pending = a;
+        app->wave_osc_remain = app->wave_prev_h - a;
 
         return true;
     }
@@ -188,8 +204,10 @@ void txstart(FlipperHamApp* app)
     char bulletin_id;
     char dst[CALL_LEN];
     char dst_full[CALL_LEN];
+    const FlipperHamModemProfile* p;
     const char* src;
     uint16_t i;
+    uint16_t n;
     uint8_t j;
     uint8_t src_ssid;
     uint8_t ssid;
@@ -201,6 +219,9 @@ void txstart(FlipperHamApp* app)
     app->level = true;
     app->wave_len = 0;
     app->wave_carry = 0;
+    app->wave_pending = 0;
+    app->wave_osc_remain = 0;
+    app->wave_prev_h = 0;
     app->pre_b = 0;
     app->pre_h = 0;
     app->pre_c = 0;
@@ -212,6 +233,7 @@ void txstart(FlipperHamApp* app)
     if(!app->pkt) return;
     if(!app->wave) return;
     if(app->tx_msg_index >= TXT_N) return;
+    p = &flipperham_modem_profiles[app->encoding_index];
 
     if(app->tx_t == 0)
     {
@@ -280,11 +302,18 @@ void txstart(FlipperHamApp* app)
     packet_stuff(app->pkt);
     packet_nrzi(app->pkt);
 
+    if(app->leadin_ms)
+    {
+        n = (app->leadin_ms * p->baud + 500) / 1000;
+        if(!n) n = 1;
+        for(i = 0; i < n; i++) if(!wave_put(app, 1)) return;
+    }
+
     if(app->preamble_ms)
     {
-        app->pre_us = (app->preamble_ms * flipperham_modem_profiles[app->encoding_index].baud + 4000) / 8000;
-        if(!app->pre_us) app->pre_us = 1;
-        app->pre_b = 1000000.0 / flipperham_modem_profiles[app->encoding_index].baud;
+        n = (app->preamble_ms * p->baud + 4000) / 8000;
+        if(!n) n = 1;
+        for(i = 0; i < n; i++) if(!wave_flag(app)) return;
     }
 
     if(!wave_flag(app)) return;
@@ -301,7 +330,12 @@ void txstart(FlipperHamApp* app)
         if(!wave_flag(app)) return;
     }
 
-    if(!app->wave_len && !app->pre_us) app->tx_done = true;
+    if(app->wave_pending > (double)0.000001f) if(!wave_add(app, app->wave_pending)) return;
+    app->wave_pending = 0;
+    app->wave_osc_remain = 0;
+    app->wave_prev_h = 0;
+
+    if(!app->wave_len) app->tx_done = true;
     else app->tx_ok = true;
 }
 
@@ -309,53 +343,10 @@ void txstart(FlipperHamApp* app)
 static LevelDuration edge_yield(void* context)
 {
     FlipperHamApp* app = context;
-    static const uint8_t flag[] = {0, 1, 1, 1, 1, 1, 1, 0};
-    const FlipperHamModemProfile* p;
     LevelDuration ld;
     uint16_t half_us;
-    double a;
-    uint8_t bit;
 
     if(app->tx_done) return level_duration_reset();
-
-    if(app->pre_us)
-    {
-        if(app->pre_a <= (double)0.000001f)
-        {
-            bit = flag[app->pre_k++];
-            if(bit == 0) app->wave_is_mark = !app->wave_is_mark;
-            p = &flipperham_modem_profiles[app->encoding_index];
-            if(app->wave_is_mark) app->pre_h = 1000000.0 / (2.0 * p->mark_hz);
-            else app->pre_h = 1000000.0 / (2.0 * p->space_hz);
-            app->pre_a = app->pre_b;
-            if(app->pre_k >= sizeof(flag))
-            {
-                app->pre_k = 0;
-                app->pre_us--;
-            }
-        }
-
-        if(app->pre_a > app->pre_h + (double)0.000001f)
-        {
-            a = app->pre_h + app->pre_c;
-            half_us = d2(a);
-            app->pre_c = a - half_us;
-            app->pre_a -= app->pre_h;
-        }
-        else
-        {
-            a = app->pre_a + app->pre_c;
-            half_us = d2(a);
-            app->pre_c = a - half_us;
-            app->pre_a = 0;
-        }
-
-        if(!half_us) half_us = 1;
-        ld = level_duration_make(app->level, half_us);
-        app->level = !app->level;
-        if(!app->pre_us) if(app->pre_a <= (double)0.000001f) if(!app->wave_len) app->tx_done = true;
-        return ld;
-    }
 
     if(app->wave_i >= app->wave_len)
     {

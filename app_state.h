@@ -49,6 +49,7 @@ typedef struct FlipperHamApp
     uint8_t rf_m;
     uint8_t rf_d;
     uint8_t repeat_n;
+    uint16_t leadin_ms;
     uint16_t preamble_ms;
     uint8_t repeat_i;
     bool r_w;
@@ -57,6 +58,9 @@ typedef struct FlipperHamApp
     uint16_t* wave;
     uint16_t wave_len;
     double wave_carry;
+    double wave_pending;
+    double wave_osc_remain;
+    double wave_prev_h;
     double pre_b;
     double pre_h;
     double pre_c;

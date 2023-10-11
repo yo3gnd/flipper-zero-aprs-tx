@@ -72,7 +72,8 @@ static void cfgdefs(FlipperHamApp* app)
     app->tx_freq_index = 0;
     app->d_s = 0;
     app->repeat_n = 1;
-    app->preamble_ms = 50;
+    app->leadin_ms = 50;
+    app->preamble_ms = 350;
 
 
     snprintf(app->bulletin[0], sizeof(app->bulletin[0]), "flipper bulletin");
@@ -124,6 +125,7 @@ void cfgsave(FlipperHamApp* app)
     c->tx_freq_index = app->tx_freq_index;
     c->d_s = app->d_s;
     c->repeat_n = app->repeat_n;
+    c->leadin_ms = app->leadin_ms;
     c->preamble_ms = app->preamble_ms;
 
     memcpy(c->bulletin, app->bulletin, sizeof(c->bulletin));
@@ -473,6 +475,7 @@ void cfgload(FlipperHamApp* app)
     app->tx_freq_index = c->tx_freq_index;
     app->d_s = c->d_s;
     app->repeat_n = c->repeat_n;
+    app->leadin_ms = c->leadin_ms;
     app->preamble_ms = c->preamble_ms;
 
     memcpy(app->bulletin, c->bulletin, sizeof(app->bulletin));
@@ -501,8 +504,10 @@ void cfgload(FlipperHamApp* app)
 
     if(app->d_s > 15) app->d_s = 0;
     if(!app->repeat_n || app->repeat_n > 5) app->repeat_n = 1;
-    if(app->preamble_ms > 500) app->preamble_ms = 500;
-    app->preamble_ms = (app->preamble_ms / 25) * 25;
+    if(app->leadin_ms > 1000) app->leadin_ms = 1000;
+    if(app->preamble_ms > 1000) app->preamble_ms = 1000;
+    app->leadin_ms = (app->leadin_ms / 50) * 50;
+    app->preamble_ms = (app->preamble_ms / 50) * 50;
 
     pf(app);
 
