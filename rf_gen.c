@@ -54,14 +54,25 @@ static LevelDuration edge_yield(void* context);
 static uint16_t d2(double a);
 
 
-FLIPPERHAM_ASYNC_PRESET(flipperham_preset_2fsk_dev5_16khz_async_regs, 0x04, 0x83, 0x67, 0x15)
-  FLIPPERHAM_ASYNC_PRESET(flipperham_preset_2fsk_dev2_38khz_async_regs, 0x04, 0x83, 0x67, 0x04)
-FLIPPERHAM_ASYNC_PRESET(flipperham_preset_2fsk_dev3_17khz_async_regs, 0x04, 0x83, 0x67, 0x10)
+FLIPPERHAM_ASYNC_PRESET(flipperham_preset_2fsk_d00_async_regs, 0x04, 0x83, 0x67, 0x00)
+FLIPPERHAM_ASYNC_PRESET(flipperham_preset_2fsk_d01_async_regs, 0x04, 0x83, 0x67, 0x01)
+FLIPPERHAM_ASYNC_PRESET(flipperham_preset_2fsk_d02_async_regs, 0x04, 0x83, 0x67, 0x02)
+FLIPPERHAM_ASYNC_PRESET(flipperham_preset_2fsk_d03_async_regs, 0x04, 0x83, 0x67, 0x03)
+  FLIPPERHAM_ASYNC_PRESET(flipperham_preset_2fsk_d04_async_regs, 0x04, 0x83, 0x67, 0x04)
+FLIPPERHAM_ASYNC_PRESET(flipperham_preset_2fsk_d05_async_regs, 0x04, 0x83, 0x67, 0x05)
+FLIPPERHAM_ASYNC_PRESET(flipperham_preset_2fsk_d06_async_regs, 0x04, 0x83, 0x67, 0x06)
+FLIPPERHAM_ASYNC_PRESET(flipperham_preset_2fsk_d07_async_regs, 0x04, 0x83, 0x67, 0x07)
+FLIPPERHAM_ASYNC_PRESET(flipperham_preset_2fsk_d15_async_regs, 0x04, 0x83, 0x67, 0x15)
 
-
-FLIPPERHAM_ASYNC_PRESET(flipperham_preset_gfsk_dev2_38khz_async_regs, 0x14, 0x83, 0x67, 0x04)
-FLIPPERHAM_ASYNC_PRESET(flipperham_preset_gfsk_dev3_17khz_async_regs, 0x14, 0x83, 0x67, 0x10)
-FLIPPERHAM_ASYNC_PRESET(flipperham_preset_gfsk_dev5_16khz_async_regs, 0x14, 0x83, 0x67, 0x15)
+FLIPPERHAM_ASYNC_PRESET(flipperham_preset_gfsk_d00_async_regs, 0x14, 0x83, 0x67, 0x00)
+FLIPPERHAM_ASYNC_PRESET(flipperham_preset_gfsk_d01_async_regs, 0x14, 0x83, 0x67, 0x01)
+FLIPPERHAM_ASYNC_PRESET(flipperham_preset_gfsk_d02_async_regs, 0x14, 0x83, 0x67, 0x02)
+FLIPPERHAM_ASYNC_PRESET(flipperham_preset_gfsk_d03_async_regs, 0x14, 0x83, 0x67, 0x03)
+FLIPPERHAM_ASYNC_PRESET(flipperham_preset_gfsk_d04_async_regs, 0x14, 0x83, 0x67, 0x04)
+FLIPPERHAM_ASYNC_PRESET(flipperham_preset_gfsk_d05_async_regs, 0x14, 0x83, 0x67, 0x05)
+FLIPPERHAM_ASYNC_PRESET(flipperham_preset_gfsk_d06_async_regs, 0x14, 0x83, 0x67, 0x06)
+FLIPPERHAM_ASYNC_PRESET(flipperham_preset_gfsk_d07_async_regs, 0x14, 0x83, 0x67, 0x07)
+FLIPPERHAM_ASYNC_PRESET(flipperham_preset_gfsk_d15_async_regs, 0x14, 0x83, 0x67, 0x15)
 
 
 const FlipperHamModemProfile flipperham_modem_profiles[] =
@@ -73,14 +84,24 @@ const FlipperHamModemProfile flipperham_modem_profiles[] =
 
   const FlipperHamPreset flipperham_presets[] =
   {
-      { "2FSK 2.5", flipperham_preset_2fsk_dev2_38khz_async_regs },
-      { "GFSK 2.5", flipperham_preset_gfsk_dev2_38khz_async_regs },
-
-      { "2FSK 3.0", flipperham_preset_2fsk_dev3_17khz_async_regs },
-      { "GFSK 3.0", flipperham_preset_gfsk_dev3_17khz_async_regs },
-
-      { "2FSK 5.0", flipperham_preset_2fsk_dev5_16khz_async_regs },
-      { "GFSK 5.0", flipperham_preset_gfsk_dev5_16khz_async_regs },
+      { "2FSK 1.6", flipperham_preset_2fsk_d00_async_regs },
+      { "GFSK 1.6", flipperham_preset_gfsk_d00_async_regs },
+      { "2FSK 1.8", flipperham_preset_2fsk_d01_async_regs },
+      { "GFSK 1.8", flipperham_preset_gfsk_d01_async_regs },
+      { "2FSK 2.0", flipperham_preset_2fsk_d02_async_regs },
+      { "GFSK 2.0", flipperham_preset_gfsk_d02_async_regs },
+      { "2FSK 2.2", flipperham_preset_2fsk_d03_async_regs },
+      { "GFSK 2.2", flipperham_preset_gfsk_d03_async_regs },
+      { "2FSK 2.4", flipperham_preset_2fsk_d04_async_regs },
+      { "GFSK 2.4", flipperham_preset_gfsk_d04_async_regs },
+      { "2FSK 2.5", flipperham_preset_2fsk_d05_async_regs },
+      { "GFSK 2.5", flipperham_preset_gfsk_d05_async_regs },
+      { "2FSK 2.8", flipperham_preset_2fsk_d06_async_regs },
+      { "GFSK 2.8", flipperham_preset_gfsk_d06_async_regs },
+      { "2FSK 3.0", flipperham_preset_2fsk_d07_async_regs },
+      { "GFSK 3.0", flipperham_preset_gfsk_d07_async_regs },
+      { "2FSK 5.0", flipperham_preset_2fsk_d15_async_regs },
+      { "GFSK 5.0", flipperham_preset_gfsk_d15_async_regs },
   };
 
 
@@ -89,7 +110,7 @@ void pf(FlipperHamApp* app)
     uint8_t a;
 
     if(app->rf_m > 1) app->rf_m = 0;
-    if(app->rf_d > 2) app->rf_d = 2;
+    if(app->rf_d > 8) app->rf_d = 8;
 
     a = (app->rf_d * 2) + app->rf_m;
     if(a >= sizeof(flipperham_presets) / sizeof(flipperham_presets[0])) a = FlipperHamPresetDefault;

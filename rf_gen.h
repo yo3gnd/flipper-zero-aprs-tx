@@ -13,7 +13,7 @@ typedef struct {
 
 enum {
     FlipperHamModemProfileDefault = 1,
-    FlipperHamPresetDefault = 4,
+    FlipperHamPresetDefault = 16,
 };
 
 
@@ -28,7 +28,7 @@ typedef struct {
 #define WAVE_N 28672
 
 
-extern const FlipperHamPreset flipperham_presets[6];
+extern const FlipperHamPreset flipperham_presets[18];
 extern const FlipperHamModemProfile flipperham_modem_profiles[2];
 
 
