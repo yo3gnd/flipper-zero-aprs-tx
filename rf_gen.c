@@ -162,8 +162,7 @@ static uint16_t d2(double a)
         }
         else if(h < app->wave_prev_h - (double)0.000001f || h > app->wave_prev_h + (double)0.000001f)
         {
-            b -= app->wave_osc_remain;
-            if(!wave_add(app, app->wave_prev_h)) return false;
+            if(app->wave_pending > (double)0.000001f) if(!wave_add(app, app->wave_pending)) return false;
             app->wave_prev_h = h;
             app->wave_pending = 0;
             app->wave_osc_remain = h;
