@@ -14,7 +14,7 @@
 #include <gui/view_dispatcher.h>
 #include <gui/view_port.h>
 #include <cc1101_regs.h>
-#include <furi_hal_subghz_configs.h>
+#include <lib/subghz/devices/cc1101_configs.h>
 #include <lib/toolbox/level_duration.h>
 #include <storage/storage.h>
 

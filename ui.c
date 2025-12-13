@@ -3,12 +3,6 @@
 #include "ui.h"
 #include "rf_gen.h"
 
-static void bx0(void* context, uint32_t index);
-static void sx0(void* context, uint32_t index);
-static void cx0(void* context, uint32_t index);
-static void fq0(void* context, uint32_t index);
-static void mx0(void* context, uint32_t index);
-static void px0(void* context, uint32_t index);
 #include <furi_hal.h>
 #include <gui/view.h>
 #include <notification/notification.h>
@@ -497,7 +491,7 @@ static void bmenu(FlipperHamApp* app)
         if(!app->bulletin_used[i]) continue;
         if(!app->bulletin[i][0]) continue;
 
-        submenu_add_item(app->bulletin_menu, app->bulletin[i], FlipperHamBulletinIndexBase + i, bx0, app);
+        submenu_add_item_ex( app->bulletin_menu, app->bulletin[i], FlipperHamBulletinIndexBase + i, bx, app);
     }
 
     submenu_set_selected_item(app->bulletin_menu, FlipperHamBulletinIndexAdd);
@@ -521,7 +515,7 @@ static void stmenu(FlipperHamApp* app)
         if(!app->status_used[i]) continue;
         if(!app->status[i][0]) continue;
 
-        submenu_add_item(app->status_menu, app->status[i], FlipperHamStatusIndexBase + i, sx0, app);
+        submenu_add_item_ex( app->status_menu, app->status[i], FlipperHamStatusIndexBase + i, sx, app);
     }
 
     submenu_set_selected_item(app->status_menu, FlipperHamStatusIndexAdd);
@@ -548,7 +542,7 @@ static void stmenu(FlipperHamApp* app)
             if(!app->calls_used[i]) continue;
             if(!app->calls[i][0]) continue;
 
-            submenu_add_item(app->call_menu, app->calls[i], FlipperHamCallIndexBase + i, cx0, app);
+            submenu_add_item_ex( app->call_menu, app->calls[i], FlipperHamCallIndexBase + i, cx, app);
         }
 
         submenu_set_selected_item(app->call_menu, FlipperHamCallIndexAdd);
@@ -756,14 +750,14 @@ static void fmenu(FlipperHamApp* app)
     submenu_reset(app->freq_menu);
 
     if(app->freq_n < FREQ_N)
-        submenu_add_item(app->freq_menu, "Add new...", FlipperHamFreqIndexAdd, fq0, app);
+        submenu_add_item_ex( app->freq_menu, "Add new...", FlipperHamFreqIndexAdd, fq, app);
 
     for(i = 0; i < FREQ_N; i++)
     {
         if(!app->freq_used[i]) continue;
         if(app->tx_freq_index == i) snprintf(app->freq_s[i], sizeof(app->freq_s[i]), "%06lu.%1lu *", (unsigned long)(app->freq[i] / 1000UL), (unsigned long)((app->freq[i] % 1000UL) / 100UL));
         else fsh(app->freq_s[i], sizeof(app->freq_s[i]), app->freq[i]);
-        submenu_add_item(app->freq_menu, app->freq_s[i], FlipperHamFreqIndexBase + i, fq0, app);
+        submenu_add_item_ex( app->freq_menu, app->freq_s[i], FlipperHamFreqIndexBase + i, fq, app);
     }
 
     if(app->freq_n < FREQ_N) submenu_set_selected_item(app->freq_menu, FlipperHamFreqIndexAdd);
@@ -910,7 +904,7 @@ static void mmenu(FlipperHamApp* app)
         if(!app->message_used[i]) continue;
         if(!app->message[i][0]) continue;
 
-        submenu_add_item(app->message_menu, app->message[i], FlipperHamMessageIndexBase + i, mx0, app);
+        submenu_add_item_ex( app->message_menu, app->message[i], FlipperHamMessageIndexBase + i, mx, app);
     }
 
     submenu_set_selected_item(app->message_menu, FlipperHamMessageIndexAdd);
@@ -934,7 +928,7 @@ static void pmenu(FlipperHamApp* app)
         if(!app->pos_used[i]) continue;
         if(!app->pos_name[i][0]) continue;
 
-        submenu_add_item(app->position_menu, app->pos_name[i], FlipperHamPositionIndexBase + i, px0, app);
+        submenu_add_item_ex( app->position_menu, app->pos_name[i], FlipperHamPositionIndexBase + i, px, app);
     }
 
     submenu_set_selected_item(app->position_menu, FlipperHamPositionIndexAdd);
@@ -2557,14 +2551,6 @@ static void flipperham_send_hardcoded_message(FlipperHamApp* app)
     app->pkt = NULL;
     app->wave = NULL;
 }
-
-
-static void bx0(void* context, uint32_t index) { bx(context, InputTypeShort, index); }
-static void sx0(void* context, uint32_t index) { sx(context, InputTypeShort, index); }
-static void cx0(void* context, uint32_t index) { cx(context, InputTypeShort, index); }
-static void fq0(void* context, uint32_t index) { fq(context, InputTypeShort, index); }
-static void mx0(void* context, uint32_t index) { mx(context, InputTypeShort, index); }
-static void px0(void* context, uint32_t index) { px(context, InputTypeShort, index); }
 
 
 int32_t flipperham_app(void* p)

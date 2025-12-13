@@ -3,7 +3,7 @@
 
 #include <furi_hal.h>
 #include <cc1101_regs.h>
-#include <furi_hal_subghz_configs.h>
+#include <lib/subghz/devices/cc1101_configs.h>
 #include <lib/toolbox/level_duration.h>
 
 #include <stdio.h>
@@ -391,7 +391,7 @@ void flipperham_radio_start(FlipperHamApp* app)
 {
     furi_hal_subghz_reset();
     furi_hal_subghz_idle();
-    furi_hal_subghz_load_custom_preset((uint8_t*)flipperham_preset->regs);
+    furi_hal_subghz_load_custom_preset(flipperham_preset->regs);
     furi_hal_subghz_set_frequency_and_path(txf(app));
     furi_hal_subghz_flush_tx();
 
