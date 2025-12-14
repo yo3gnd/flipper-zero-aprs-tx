@@ -77,6 +77,7 @@ enum
     FlipperHamViewPosEdit,
     FlipperHamViewHam,
     FlipperHamViewHamTx,
+    FlipperHamViewReadme,
 };
 
 
@@ -86,6 +87,7 @@ enum
     FlipperHamMenuIndexSettings,
     FlipperHamMenuIndexCallbook,
     FlipperHamMenuIndexHam,
+    FlipperHamMenuIndexReadme,
 };
 
 

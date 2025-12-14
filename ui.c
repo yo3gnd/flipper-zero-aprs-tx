@@ -26,6 +26,7 @@ static uint32_t flipperham_freq_edit_exit_callback(void* context);
 static uint32_t flipperham_pos_edit_exit_callback(void* context);
 static uint32_t flipperham_ham_exit_callback(void* context);
 static uint32_t flipperham_ham_tx_exit_callback(void* context);
+static uint32_t flipperham_readme_exit_callback(void* context);
 static uint32_t bookx(void* context);
 static uint32_t c2x(void* context);
 static uint32_t flipperham_text_exit_callback(void* context);
@@ -105,6 +106,7 @@ static void flipperham_app_free(FlipperHamApp* app);
 static void flipperham_send_hardcoded_message(FlipperHamApp* app);
 static void flipperham_menu_callback(void* context, uint32_t index);
 static void flipperham_send_callback(void* context, uint32_t index);
+static void rmb(GuiButtonType result, InputType type, void* context);
 
 static FlipperHamApp* gapp;
 static bool cpy(FlipperHamApp* app);
@@ -411,6 +413,13 @@ static uint32_t flipperham_ham_tx_exit_callback(void* context)
     return FlipperHamViewHam;
 }
 
+static uint32_t flipperham_readme_exit_callback(void* context)
+{
+    UNUSED(context);
+
+    return FlipperHamViewMenu;
+}
+
 static uint32_t bookx(void* context)
 {
     UNUSED(context);
@@ -446,6 +455,16 @@ static void flipperham_menu_callback(void* context, uint32_t index)
         view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewBook);
     }
     if(index == FlipperHamMenuIndexHam) view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewHam);
+    if(index == FlipperHamMenuIndexReadme) view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewReadme);
+}
+
+static void rmb(GuiButtonType result, InputType type, void* context)
+{
+    FlipperHamApp* app = context;
+
+    if(type != InputTypeShort) return;
+    if(result != GuiButtonTypeLeft) return;
+    view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewMenu);
 }
 
 static void flipperham_send_callback(void* context, uint32_t index)
@@ -2132,6 +2151,7 @@ static void flipperham_menu_free(FlipperHamApp* app)
         view_dispatcher_remove_view(app->view_dispatcher, FlipperHamViewHam);
         view_dispatcher_remove_view(app->view_dispatcher, FlipperHamViewHamTx);
         view_dispatcher_remove_view(app->view_dispatcher, FlipperHamViewTextInput);
+        view_dispatcher_remove_view(app->view_dispatcher, FlipperHamViewReadme);
         view_dispatcher_free(app->view_dispatcher);
         app->view_dispatcher = NULL;
     }
@@ -2201,6 +2221,12 @@ static void flipperham_menu_free(FlipperHamApp* app)
           submenu_free(app->book_menu);
           app->book_menu = NULL;
       }
+
+    if(app->readme_widget)
+    {
+        widget_free(app->readme_widget);
+        app->readme_widget = NULL;
+    }
 
     if(app->freq_menu)
     {
@@ -2291,6 +2317,7 @@ static FlipperHamApp* flipperham_app_alloc(void)
     app->freq_edit_menu = variable_item_list_alloc();
     app->pos_edit_menu = variable_item_list_alloc();
     app->text_input = text_input_alloc();
+    app->readme_widget = widget_alloc();
 
         app->view_port = NULL;
         app->tx_started = false;
@@ -2351,6 +2378,7 @@ static FlipperHamApp* flipperham_app_alloc(void)
     submenu_add_item( app->submenu, "Settings", FlipperHamMenuIndexSettings, flipperham_menu_callback, app);
     submenu_add_item( app->submenu, "Callbook", FlipperHamMenuIndexCallbook, flipperham_menu_callback, app);
     if(app->ham_ok) submenu_add_item( app->submenu, "Ham Radio", FlipperHamMenuIndexHam, flipperham_menu_callback, app);
+    submenu_add_item( app->submenu, "About Flipper ham", FlipperHamMenuIndexReadme, flipperham_menu_callback, app);
 
 
     submenu_add_item( app->send_menu, "Message", FlipperHamSendIndexMessage, flipperham_send_callback, app);
@@ -2370,6 +2398,14 @@ static FlipperHamApp* flipperham_app_alloc(void)
     ssidfix(app);
     hmenu(app);
     htmenu(app);
+    widget_add_text_scroll_element(
+        app->readme_widget,
+        0,
+        0,
+        128,
+        52,
+        "www.yo3gnd.ro\n\nAPRS experimental transmiter for Flipper. Don't transmit where you shouldn't. Uses FSK as a weak substitute for FM. Works, sometimes.\n\nI'm quite interested on what kind of hardware and with what parameters you got decodes - reports are appreciated");
+    widget_add_button_element(app->readme_widget, GuiButtonTypeLeft, "Back", rmb, app);
 
 
     view_set_previous_callback(submenu_get_view(app->submenu), flipperham_exit_callback);
@@ -2389,6 +2425,7 @@ static FlipperHamApp* flipperham_app_alloc(void)
     view_set_previous_callback(variable_item_list_get_view(app->ham_menu), flipperham_ham_exit_callback);
     view_set_previous_callback(variable_item_list_get_view(app->ham_tx_menu), flipperham_ham_tx_exit_callback);
     view_set_previous_callback(text_input_get_view(app->text_input), flipperham_text_exit_callback);
+    view_set_previous_callback(widget_get_view(app->readme_widget), flipperham_readme_exit_callback);
     variable_item_list_set_enter_callback(app->ssid_menu, se, app);
     variable_item_list_set_enter_callback(app->settings_menu, re, app);
     variable_item_list_set_enter_callback(app->ham_menu, hre, app);
@@ -2414,6 +2451,7 @@ static FlipperHamApp* flipperham_app_alloc(void)
     view_dispatcher_add_view( app->view_dispatcher, FlipperHamViewHam, variable_item_list_get_view(app->ham_menu));
     view_dispatcher_add_view( app->view_dispatcher, FlipperHamViewHamTx, variable_item_list_get_view(app->ham_tx_menu));
     view_dispatcher_add_view( app->view_dispatcher, FlipperHamViewTextInput, text_input_get_view(app->text_input));
+    view_dispatcher_add_view( app->view_dispatcher, FlipperHamViewReadme, widget_get_view(app->readme_widget));
     view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewMenu);
     return app;
 }

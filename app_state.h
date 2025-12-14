@@ -7,6 +7,7 @@
 #include <gui/modules/submenu.h>
 #include <gui/modules/text_input.h>
 #include <gui/modules/variable_item_list.h>
+#include <gui/modules/widget.h>
 
 
 #include <gui/view_dispatcher.h>
@@ -35,6 +36,7 @@ typedef struct FlipperHamApp
     VariableItemList* freq_edit_menu;
     VariableItemList* pos_edit_menu;
     TextInput* text_input;
+    Widget* readme_widget;
     ViewPort* view_port;
     volatile uint16_t wave_i;
     volatile bool level;
