@@ -1,110 +1,147 @@
 #include "aprs.h"
 
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 
-#include <stdbool.h>
-
-
-static int ll(char* out, uint16_t n, const char* s, uint8_t lon)
+static int aprs_coord(char *out, uint16_t n, const char *s, uint8_t lon)
 {
-    float a;
-    float b;
-    float c;
-    char* e;
-    int d;
-    int m;
-    int h;
+    float value;
+    float minutes;
+    float hundredths;
+    char *end;
+    int degrees;
+    int whole_minutes;
+    int minute_hundredths;
     char hemi;
 
-    if(!out) return 0;
-    if(!n) return 0;
-    if(!s) return 0;
+    if (!out || !n || !s)
+    {
+        return 0;
+    }
 
-    a = strtof(s, &e);
-    if(e == s) return 0;
-    if(*e) return 0;
+    value = strtof(s, &end);
+    if (end == s || *end)
+    {
+        return 0;
+    }
 
     hemi = lon ? 'E' : 'N';
-    if(a < 0) {
-        a = -a;
+    if (value < 0)
+    {
+        value = -value;
         hemi = lon ? 'W' : 'S';
     }
 
-    if(lon) {
-        if(a > 180.0f) return 0;
-    } else {
-        if(a > 90.0f) return 0;
-    }
-
-    d = (int)a;
-    b = (a - d) * 60.0f;
-    c = b * 100.0f + 0.5f;
-    h = (int)c;
-    m = h / 100;
-    h = h % 100;
-
-    if(m >= 60)
+    if (lon)
     {
-        m = 0;
-        h = 0;
-        d++;
-    }
-
-    if(lon)
-    {
-        if(d > 180) return 0;
-        return snprintf(out, n, "%03d%02d.%02d%c", d, m, h, hemi);
-    }
-
-    if(d > 90) return 0;
-    return snprintf(out, n, "%02d%02d.%02d%c", d, m, h, hemi);
-}
-
-int aprs_ll_clamp(char* out, uint16_t n, const char* s, uint8_t lon)
-{
-    float a;
-    char* e;
-
-    if(!out) return 0;
-    if(!n) return 0;
-    if(!s) return 0;
-
-    a = strtof(s, &e);
-    if(e == s) return 0;
-    if(*e) return 0;
-
-    if(lon)
-    {
-        if(a < -180.0f) a = -180.0f;
-        if(a > 180.0f) a = 180.0f;
+        if (value > 180.0f)
+        {
+            return 0;
+        }
     }
     else
     {
-        if(a < -90.0f) a = -90.0f;
-        if(a > 90.0f) a = 90.0f;
+        if (value > 90.0f)
+        {
+            return 0;
+        }
     }
 
-    return snprintf(out, n, "%.5f", (double)a);
+    degrees = (int)value;
+    minutes = (value - degrees) * 60.0f;
+    hundredths = minutes * 100.0f + 0.5f;
+    minute_hundredths = (int)hundredths;
+    whole_minutes = minute_hundredths / 100;
+    minute_hundredths = minute_hundredths % 100;
+
+    if (whole_minutes >= 60)
+    {
+        whole_minutes = 0;
+        minute_hundredths = 0;
+        degrees++;
+    }
+
+    if (lon)
+    {
+        if (degrees > 180)
+        {
+            return 0;
+        }
+
+        return snprintf(out, n, "%03d%02d.%02d%c", degrees, whole_minutes, minute_hundredths, hemi);
+    }
+
+    if (degrees > 90)
+    {
+        return 0;
+    }
+
+    return snprintf(out, n, "%02d%02d.%02d%c", degrees, whole_minutes, minute_hundredths, hemi);
 }
 
-int aprs_lat(char* out, uint16_t n, const char* s)
+int aprs_ll_clamp(char *out, uint16_t n, const char *s, uint8_t lon)
 {
-    return ll(out, n, s, 0);
+    float value;
+    char *end;
+
+    if (!out || !n || !s)
+    {
+        return 0;
+    }
+
+    value = strtof(s, &end);
+    if (end == s || *end)
+    {
+        return 0;
+    }
+
+    if (lon)
+    {
+        if (value < -180.0f)
+        {
+            value = -180.0f;
+        }
+        if (value > 180.0f)
+        {
+            value = 180.0f;
+        }
+    }
+    else
+    {
+        if (value < -90.0f)
+        {
+            value = -90.0f;
+        }
+        if (value > 90.0f)
+        {
+            value = 90.0f;
+        }
+    }
+
+    /* Store positions in a stable decimal format so edits round-trip cleanly. */
+    return snprintf(out, n, "%.5f", (double)value);
 }
 
-int aprs_lon(char* out, uint16_t n, const char* s)
+int aprs_lat(char *out, uint16_t n, const char *s)
 {
-    return ll(out, n, s, 1);
+    return aprs_coord(out, n, s, 0);
 }
 
-int aprs_pos(char* out, uint16_t n, const char* name, const char* lat, const char* lon)
+int aprs_lon(char *out, uint16_t n, const char *s)
+{
+    return aprs_coord(out, n, s, 1);
+}
+
+int aprs_pos(char *out, uint16_t n, const char *name, const char *lat, const char *lon)
 {
     char a[9];
     char b[10];
 
-    if(aprs_lat(a, sizeof(a), lat) <= 0) return 0;
-    if(aprs_lon(b, sizeof(b), lon) <= 0) return 0;
+    if (aprs_lat(a, sizeof(a), lat) <= 0)
+        return 0;
+    if (aprs_lon(b, sizeof(b), lon) <= 0)
+        return 0;
     return snprintf(out, n, "!%s/%s-%s", a, b, name ? name : "");
 }
 

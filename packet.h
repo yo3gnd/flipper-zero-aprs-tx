@@ -2,7 +2,8 @@
 
 #include <stdint.h>
 
-typedef struct {
+typedef struct
+{
     uint8_t payload[96];
     uint16_t payload_len;
 
@@ -19,15 +20,14 @@ typedef struct {
     uint16_t nrzi_len;
 } Packet;
 
+void packet_make_ax25(Packet *p, const char *from, uint8_t from_ssid, const char *to,
+                      uint8_t to_ssid);
+void packet_add_fcs(Packet *p);
+void packet_init(Packet *p);
 
-void packet_make_ax25(Packet* p, const char* from, uint8_t from_ssid, const char* to, uint8_t to_ssid);
-void packet_add_fcs(Packet* p);
-void packet_init(Packet* p);
+void packet_stuff(Packet *p);
+void packet_nrzi(Packet *p);
 
-
-void packet_stuff(Packet* p);
-void packet_nrzi(Packet* p);
-
-
-void packet_make_payload(Packet* p, const char* s);
-void packet_do_all(Packet* p, const char* from, uint8_t from_ssid, const char* to, uint8_t to_ssid, const char* s);
+void packet_make_payload(Packet *p, const char *s);
+void packet_do_all(Packet *p, const char *from, uint8_t from_ssid, const char *to, uint8_t to_ssid,
+                   const char *s);

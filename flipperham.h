@@ -3,31 +3,31 @@
 #include <furi.h>
 #include <stdint.h>
 
+#define TXT_LEN 68
+#define TXT_N 16
+#define POS_LEN 16
+#define CALL_LEN 10
+#define CALL_N 32
+#define FREQ_N 4
+#define HAM_N 8
 
-#define TXT_LEN       68
-#define CFG_FILE      "/ext/apps_data/aprstx/cfg.bin"
-#define CALL_N        32
-#define MY_CALL       "FL1PER"
-#define CARRIER_HZ    433250000UL
-#define FREQ_N        4
-#define HAM_N         8
-#define POS_LEN       16
+#define CARRIER_HZ 433250000UL
+#define MY_CALL "FL1PER"
+#define MY_TOCALL "APZFLP"
 
-#define CFG_DIR       "/ext/apps_data/aprstx"
+#define CFG_DIR "/ext/apps_data/aprstx"
+#define CFG_FILE "/ext/apps_data/aprstx/cfg.bin"
+#define CALLBOOK_DIR "/ext/ham"
 #define CALLBOOK_FILE "/ext/ham/callbook.txt"
 #define MY_CALLS_FILE "/ext/ham/my-callsigns.txt"
-#define TXT_N         16
-#define MY_TOCALL     "APZFLP"
-#define CALLBOOK_DIR  "/ext/ham"
-#define CALL_LEN      10
 
 typedef struct
 {
     uint8_t encoding_index;
-    uint8_t rf_m;
-    uint8_t rf_d;
+    uint8_t rf_mod;
+    uint8_t rf_dev;
     uint8_t tx_freq_index;
-    uint8_t d_s;
+    uint8_t dst_ssid;
     uint8_t repeat_n;
     uint8_t ham_index;
     uint16_t leadin_ms;
@@ -57,7 +57,6 @@ typedef struct
     uint8_t freq_n;
 } FlipperHamCfg;
 
-
 enum
 {
     FlipperHamViewMenu = 0,
@@ -80,7 +79,6 @@ enum
     FlipperHamViewReadme,
 };
 
-
 enum
 {
     FlipperHamMenuIndexSend = 0,
@@ -90,7 +88,6 @@ enum
     FlipperHamMenuIndexReadme,
 };
 
-
 enum
 {
     FlipperHamSendIndexMessage = 0,
@@ -99,12 +96,10 @@ enum
     FlipperHamSendIndexBulletin,
 };
 
-
 enum
 {
     FlipperHamSettingsIndexFreq = 0,
 };
-
 
 enum
 {
@@ -112,13 +107,11 @@ enum
     FlipperHamBulletinIndexBase = 100,
 };
 
-
 enum
 {
     FlipperHamStatusIndexAdd = 0,
     FlipperHamStatusIndexBase = 200,
 };
-
 
 enum
 {
@@ -126,13 +119,11 @@ enum
     FlipperHamCallIndexBase = 300,
 };
 
-
 enum
 {
     FlipperHamMessageIndexAdd = 0,
     FlipperHamMessageIndexBase = 400,
 };
-
 
 enum
 {
@@ -140,13 +131,11 @@ enum
     FlipperHamPositionIndexBase = 450,
 };
 
-
 enum
 {
     FlipperHamBookIndexAdd = 0,
     FlipperHamBookIndexBase = 500,
 };
-
 
 enum
 {
@@ -155,11 +144,10 @@ enum
     FlipperHamC2IndexCopy,
 };
 
-
 enum
 {
     FlipperHamFreqIndexAdd = 0,
     FlipperHamFreqIndexBase = 600,
 };
 
-int32_t flipperham_app(void* p);
+int32_t flipperham_app(void *p);

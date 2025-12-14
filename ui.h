@@ -1,24 +1,18 @@
-#ifndef GUARD_UI_H_22881
-#define GUARD_UI_H_22881
+#pragma once
 
 #include "app_state.h"
 
+void cfgsave(FlipperHamApp *app);
+void cfgload(FlipperHamApp *app);
+void callbook_save_txt(FlipperHamApp *app);
+void ham_save_txt(FlipperHamApp *app);
 
-void cfgsave(FlipperHamApp* app);
-void cfgload(FlipperHamApp* app);
-void csavetxt(FlipperHamApp* app);
-void hsavetxt(FlipperHamApp* app);
+bool call_split(const char *s, char *out, uint8_t *ssid, bool *has_ssid);
+bool call_validate(char *s);
 
-
-bool csplit(const char* s, char* out, uint8_t* ssid, bool* has_ssid);
-bool cval(char* s);
-
-
-void bfix(FlipperHamApp* app);
-void stfix(FlipperHamApp* app);
-void mfix(FlipperHamApp* app);
-void pfix(FlipperHamApp* app);
-void cfix(FlipperHamApp* app);
-void ffix(FlipperHamApp* app);
-
-#endif
+void bulletin_fix(FlipperHamApp *app);
+void status_fix(FlipperHamApp *app);
+void message_fix(FlipperHamApp *app);
+void position_fix(FlipperHamApp *app);
+void calls_fix(FlipperHamApp *app);
+void freq_fix(FlipperHamApp *app);

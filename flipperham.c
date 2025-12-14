@@ -21,27 +21,34 @@
 #include <stdio.h>
 #include <string.h>
 
-static void cloadtxt(FlipperHamApp* app);
-static void hloadtxt(FlipperHamApp* app);
+static void callbook_load_txt(FlipperHamApp *app);
+static void ham_load_txt(FlipperHamApp *app);
 
-static uint8_t pgood(FlipperHamApp* app, uint8_t i)
+static uint8_t pos_ok(FlipperHamApp *app, uint8_t i)
 {
     char a[POS_LEN];
     char b[POS_LEN];
 
-    if(i >= TXT_N) return 0;
-    if(!app->pos_name[i][0]) return 0;
-    if(!app->pos_lat[i][0]) return 0;
-    if(!app->pos_lon[i][0]) return 0;
-    if(!aprs_ll_clamp(a, sizeof(a), app->pos_lat[i], 0)) return 0;
-    if(!aprs_ll_clamp(b, sizeof(b), app->pos_lon[i], 1)) return 0;
+    if (i >= TXT_N)
+        return 0;
+    if (!app->pos_name[i][0])
+        return 0;
+    if (!app->pos_lat[i][0])
+        return 0;
+    if (!app->pos_lon[i][0])
+        return 0;
+    if (!aprs_ll_clamp(a, sizeof(a), app->pos_lat[i], 0))
+        return 0;
+    if (!aprs_ll_clamp(b, sizeof(b), app->pos_lon[i], 1))
+        return 0;
 
+    /* Keep stored positions normalized so edits and re-saves stay predictable. */
     snprintf(app->pos_lat[i], sizeof(app->pos_lat[i]), "%s", a);
     snprintf(app->pos_lon[i], sizeof(app->pos_lon[i]), "%s", b);
     return 1;
 }
 
-static void cfgdefs(FlipperHamApp* app)
+static void cfg_defaults(FlipperHamApp *app)
 {
     memset(app->bulletin, 0, sizeof(app->bulletin));
     memset(app->status, 0, sizeof(app->status));
@@ -68,14 +75,15 @@ static void cfgdefs(FlipperHamApp* app)
     app->freq_n = 0;
 
     app->encoding_index = FlipperHamModemProfileDefault;
-    app->rf_m = 0; app->rf_d = 8;
+    app->rf_mod = 0;
+    app->rf_dev = 8;
     app->tx_freq_index = 0;
-    app->d_s = 0;
+    app->dst_ssid = 0;
     app->repeat_n = 1;
     app->leadin_ms = 50;
     app->preamble_ms = 350;
 
-
+    /* Seed one valid entry of each type so a fresh install is immediately testable. */
     snprintf(app->bulletin[0], sizeof(app->bulletin[0]), "flipper bulletin");
     snprintf(app->status[0], sizeof(app->status[0]), "flipper status");
     snprintf(app->calls[0], sizeof(app->calls[0]), "FL1PER");
@@ -87,43 +95,44 @@ static void cfgdefs(FlipperHamApp* app)
     snprintf(app->pos_lat[1], sizeof(app->pos_lat[1]), "0.02");
     snprintf(app->pos_lon[1], sizeof(app->pos_lon[1]), "-0.04");
 
-        snprintf(app->message[0], sizeof(app->message[0]), "Hello from Flipper Zero! :D");
+    snprintf(app->message[0], sizeof(app->message[0]), "Hello from Flipper Zero! :D");
 
-        app->bulletin_used[0] = 1;
-        app->status_used[0] = 1;
-        app->message_used[0] = 1;
-        app->calls_used[0] = 1;
-        app->calls_used[1] = 1;
-        app->pos_used[0] = 1;
-        app->pos_used[1] = 1;
+    app->bulletin_used[0] = 1;
+    app->status_used[0] = 1;
+    app->message_used[0] = 1;
+    app->calls_used[0] = 1;
+    app->calls_used[1] = 1;
+    app->pos_used[0] = 1;
+    app->pos_used[1] = 1;
 
-        app->bulletin_n = 1;
-        app->status_n = 1;
-        app->message_n = 1;
-        app->calls_n = 2;
-        app->pos_n = 2;
-        app->freq[0] = CARRIER_HZ;
-        app->freq_used[0] = 1;
-        app->freq_n = 1;
+    app->bulletin_n = 1;
+    app->status_n = 1;
+    app->message_n = 1;
+    app->calls_n = 2;
+    app->pos_n = 2;
+    app->freq[0] = CARRIER_HZ;
+    app->freq_used[0] = 1;
+    app->freq_n = 1;
 
-    pf(app);
+    preset_fix(app);
 }
 
-void cfgsave(FlipperHamApp* app)
+void cfgsave(FlipperHamApp *app)
 {
-    Storage* storage;
-    File* file;
-    FlipperHamCfg* c;
+    Storage *storage;
+    File *file;
+    FlipperHamCfg *c;
 
     c = malloc(sizeof(FlipperHamCfg));
-    if(!c) return;
+    if (!c)
+        return;
     memset(c, 0, sizeof(FlipperHamCfg));
 
     c->encoding_index = app->encoding_index;
-    c->rf_m = app->rf_m;
-    c->rf_d = app->rf_d;
+    c->rf_mod = app->rf_mod;
+    c->rf_dev = app->rf_dev;
     c->tx_freq_index = app->tx_freq_index;
-    c->d_s = app->d_s;
+    c->dst_ssid = app->dst_ssid;
     c->repeat_n = app->repeat_n;
     c->ham_index = app->ham_index;
     c->leadin_ms = app->leadin_ms;
@@ -133,12 +142,10 @@ void cfgsave(FlipperHamApp* app)
     memcpy(c->status, app->status, sizeof(c->status));
     memcpy(c->freq, app->freq, sizeof(c->freq));
 
-
     memcpy(c->message, app->message, sizeof(c->message));
     memcpy(c->pos_name, app->pos_name, sizeof(c->pos_name));
     memcpy(c->pos_lat, app->pos_lat, sizeof(c->pos_lat));
     memcpy(c->pos_lon, app->pos_lon, sizeof(c->pos_lon));
-
 
     memcpy(c->bulletin_used, app->bulletin_used, sizeof(c->bulletin_used));
     memcpy(c->status_used, app->status_used, sizeof(c->status_used));
@@ -159,7 +166,8 @@ void cfgsave(FlipperHamApp* app)
     storage_common_mkdir(storage, "/ext/apps_data");
     storage_common_mkdir(storage, CFG_DIR);
 
-    if(storage_file_open(file, CFG_FILE, FSAM_WRITE, FSOM_CREATE_ALWAYS)) storage_file_write(file, c, sizeof(FlipperHamCfg));
+    if (storage_file_open(file, CFG_FILE, FSAM_WRITE, FSOM_CREATE_ALWAYS))
+        storage_file_write(file, c, sizeof(FlipperHamCfg));
 
     storage_file_close(file);
     storage_file_free(file);
@@ -168,10 +176,10 @@ void cfgsave(FlipperHamApp* app)
     free(c);
 }
 
-void csavetxt(FlipperHamApp* app)
+void callbook_save_txt(FlipperHamApp *app)
 {
-    Storage* storage;
-    File* file;
+    Storage *storage;
+    File *file;
     uint8_t i;
     uint16_t n;
 
@@ -180,15 +188,18 @@ void csavetxt(FlipperHamApp* app)
 
     storage_common_mkdir(storage, CALLBOOK_DIR);
 
-    if(storage_file_open(file, CALLBOOK_FILE, FSAM_WRITE, FSOM_CREATE_ALWAYS))
+    if (storage_file_open(file, CALLBOOK_FILE, FSAM_WRITE, FSOM_CREATE_ALWAYS))
     {
-        for(i = 0; i < CALL_N; i++)
+        for (i = 0; i < CALL_N; i++)
         {
-            if(!app->calls_used[i]) continue;
-            if(!app->calls[i][0]) continue;
+            if (!app->calls_used[i])
+                continue;
+            if (!app->calls[i][0])
+                continue;
 
             n = strlen(app->calls[i]);
-            if(n) storage_file_write(file, app->calls[i], n);
+            if (n)
+                storage_file_write(file, app->calls[i], n);
             storage_file_write(file, "\n", 1);
         }
     }
@@ -198,10 +209,10 @@ void csavetxt(FlipperHamApp* app)
     furi_record_close(RECORD_STORAGE);
 }
 
-static void cloadtxt(FlipperHamApp* app)
+static void callbook_load_txt(FlipperHamApp *app)
 {
-    Storage* storage;
-    File* file;
+    Storage *storage;
+    File *file;
     char a[CALL_LEN + 4];
     char c;
     uint8_t i;
@@ -216,38 +227,42 @@ static void cloadtxt(FlipperHamApp* app)
 
     storage_common_mkdir(storage, CALLBOOK_DIR);
 
-    if(!storage_file_open(file, CALLBOOK_FILE, FSAM_READ, FSOM_OPEN_EXISTING))
+    if (!storage_file_open(file, CALLBOOK_FILE, FSAM_READ, FSOM_OPEN_EXISTING))
     {
         storage_file_free(file);
         furi_record_close(RECORD_STORAGE);
+        /* Fall back to a tiny default callbook if the file is missing. */
         snprintf(app->calls[0], sizeof(app->calls[0]), "FL1PER");
         snprintf(app->calls[1], sizeof(app->calls[1]), "YO3GND-12");
         app->calls_used[0] = 1;
         app->calls_used[1] = 1;
         app->calls_n = 2;
-        csavetxt(app);
+        callbook_save_txt(app);
         return;
     }
 
     i = 0;
     j = 0;
 
-    while(storage_file_read(file, &c, 1) == 1)
+    while (storage_file_read(file, &c, 1) == 1)
     {
-        if(c == '\r') continue;
+        if (c == '\r')
+            continue;
 
-        if(c == '\n')
+        if (c == '\n')
         {
             a[i] = 0;
 
-            if(a[0] && j < CALL_N && cval(a))
+            if (a[0] && j < CALL_N && call_validate(a))
             {
                 i = 0;
-                while(a[i]) {
+                while (a[i])
+                {
                     app->calls[j][i] = a[i];
                     i++;
                 }
-                app->calls[j][i] = 0; app->calls_used[j] = 1;
+                app->calls[j][i] = 0;
+                app->calls_used[j] = 1;
                 j++;
             }
 
@@ -255,21 +270,24 @@ static void cloadtxt(FlipperHamApp* app)
             continue;
         }
 
-        if(i < sizeof(a) - 1) a[i++] = c;
+        if (i < sizeof(a) - 1)
+            a[i++] = c;
     }
 
-    if(i)
+    if (i)
     {
         a[i] = 0;
 
-        if(a[0] && j < CALL_N && cval(a))
+        if (a[0] && j < CALL_N && call_validate(a))
         {
             i = 0;
-            while(a[i]) {
+            while (a[i])
+            {
                 app->calls[j][i] = a[i];
                 i++;
             }
-            app->calls[j][i] = 0; app->calls_used[j] = 1;
+            app->calls[j][i] = 0;
+            app->calls_used[j] = 1;
             j++;
         }
     }
@@ -278,45 +296,65 @@ static void cloadtxt(FlipperHamApp* app)
     storage_file_free(file);
     furi_record_close(RECORD_STORAGE);
 
-    cfix(app);
+    calls_fix(app);
 }
 
-static uint8_t hline(FlipperHamApp* app, char* a, uint8_t j, bool* ok)
+static uint8_t hline(FlipperHamApp *app, char *a, uint8_t j, bool *ok)
 {
-    char* p;
-    char* q;
-    char* e;
+    char *p;
+    char *q;
+    char *e;
     char b[CALL_LEN];
     uint8_t s;
     bool d;
     long n;
 
     p = a;
-    while(*p == ' ' || *p == '\t') p++;
-    if(!*p) return j;
+    while (*p == ' ' || *p == '\t')
+        p++;
+    if (!*p)
+        return j;
 
     q = p;
-    while(*q && *q != ',') q++;
-    if(*q != ',') return j;
+    while (*q && *q != ',')
+        q++;
+    if (*q != ',')
+        return j;
     *q++ = 0;
 
     e = p + strlen(p);
-    while(e > p) if(e[-1] == ' ' || e[-1] == '\t') *--e = 0; else break;
-    while(*q == ' ' || *q == '\t') q++;
+    while (e > p)
+        if (e[-1] == ' ' || e[-1] == '\t')
+            *--e = 0;
+        else
+            break;
+    while (*q == ' ' || *q == '\t')
+        q++;
     e = q + strlen(q);
-    while(e > q) if(e[-1] == ' ' || e[-1] == '\t') *--e = 0; else break;
+    while (e > q)
+        if (e[-1] == ' ' || e[-1] == '\t')
+            *--e = 0;
+        else
+            break;
 
-    if(!*p || !*q) return j;
-    if(!csplit(p, b, &s, &d)) return j;
+    if (!*p || !*q)
+        return j;
+    if (!call_split(p, b, &s, &d))
+        return j;
 
     n = strtol(q, &e, 10);
-    if(e == q) return j;
-    if(*e) return j;
-    if(n < 0 || n > 65535) return j;
-    if(!call_crc(b, (uint16_t)n)) return j;
+    if (e == q)
+        return j;
+    if (*e)
+        return j;
+    if (n < 0 || n > 65535)
+        return j;
+    if (!call_crc(b, (uint16_t)n))
+        return j;
 
     *ok = true;
-    if(j >= HAM_N) return j;
+    if (j >= HAM_N)
+        return j;
 
     snprintf(app->ham_calls[j], sizeof(app->ham_calls[j]), "%s", b);
     app->ham_ssid[j] = d ? s : 0;
@@ -325,10 +363,10 @@ static uint8_t hline(FlipperHamApp* app, char* a, uint8_t j, bool* ok)
     return j + 1;
 }
 
-static void hloadtxt(FlipperHamApp* app)
+static void ham_load_txt(FlipperHamApp *app)
 {
-    Storage* storage;
-    File* file;
+    Storage *storage;
+    File *file;
     char a[64];
     char c;
     uint8_t i;
@@ -345,7 +383,7 @@ static void hloadtxt(FlipperHamApp* app)
     storage = furi_record_open(RECORD_STORAGE);
     file = storage_file_alloc(storage);
 
-    if(!storage_file_open(file, MY_CALLS_FILE, FSAM_READ, FSOM_OPEN_EXISTING))
+    if (!storage_file_open(file, MY_CALLS_FILE, FSAM_READ, FSOM_OPEN_EXISTING))
     {
         storage_file_free(file);
         furi_record_close(RECORD_STORAGE);
@@ -356,11 +394,12 @@ static void hloadtxt(FlipperHamApp* app)
     j = 0;
     ok = false;
 
-    while(storage_file_read(file, &c, 1) == 1)
+    while (storage_file_read(file, &c, 1) == 1)
     {
-        if(c == '\r') continue;
+        if (c == '\r')
+            continue;
 
-        if(c == '\n')
+        if (c == '\n')
         {
             a[i] = 0;
             j = hline(app, a, j, &ok);
@@ -368,10 +407,11 @@ static void hloadtxt(FlipperHamApp* app)
             continue;
         }
 
-        if(i < sizeof(a) - 1) a[i++] = c;
+        if (i < sizeof(a) - 1)
+            a[i++] = c;
     }
 
-    if(i)
+    if (i)
     {
         a[i] = 0;
         j = hline(app, a, j, &ok);
@@ -383,14 +423,16 @@ static void hloadtxt(FlipperHamApp* app)
 
     app->ham_n = j;
     app->ham_ok = ok && j;
-    if(app->ham_index >= app->ham_n) app->ham_index = 0;
-    if(app->ham_tx_index >= app->ham_n) app->ham_tx_index = 0;
+    if (app->ham_index >= app->ham_n)
+        app->ham_index = 0;
+    if (app->ham_tx_index >= app->ham_n)
+        app->ham_tx_index = 0;
 }
 
-void hsavetxt(FlipperHamApp* app)
+void ham_save_txt(FlipperHamApp *app)
 {
-    Storage* storage;
-    File* file;
+    Storage *storage;
+    File *file;
     uint8_t i;
     char a[48];
     int n;
@@ -398,7 +440,7 @@ void hsavetxt(FlipperHamApp* app)
     storage = furi_record_open(RECORD_STORAGE);
     file = storage_file_alloc(storage);
 
-    if(!storage_file_open(file, MY_CALLS_FILE, FSAM_WRITE, FSOM_OPEN_EXISTING))
+    if (!storage_file_open(file, MY_CALLS_FILE, FSAM_WRITE, FSOM_OPEN_EXISTING))
     {
         storage_file_free(file);
         furi_record_close(RECORD_STORAGE);
@@ -408,16 +450,19 @@ void hsavetxt(FlipperHamApp* app)
     storage_file_seek(file, 0, true);
     storage_file_truncate(file);
 
-    for(i = 0; i < app->ham_n; i++)
+    for (i = 0; i < app->ham_n; i++)
     {
-        if(!app->ham_calls[i][0]) continue;
+        if (!app->ham_calls[i][0])
+            continue;
 
-        if(app->ham_has_ssid[i])
-            n = snprintf(a, sizeof(a), "%s-%u,%u\n", app->ham_calls[i], app->ham_ssid[i], app->ham_pass[i]);
+        if (app->ham_has_ssid[i])
+            n = snprintf(a, sizeof(a), "%s-%u,%u\n", app->ham_calls[i], app->ham_ssid[i],
+                         app->ham_pass[i]);
         else
             n = snprintf(a, sizeof(a), "%s,%u\n", app->ham_calls[i], app->ham_pass[i]);
 
-        if(n > 0) storage_file_write(file, a, n);
+        if (n > 0)
+            storage_file_write(file, a, n);
     }
 
     storage_file_close(file);
@@ -425,17 +470,18 @@ void hsavetxt(FlipperHamApp* app)
     furi_record_close(RECORD_STORAGE);
 }
 
-void cfgload(FlipperHamApp* app)
+void cfgload(FlipperHamApp *app)
 {
-    Storage* storage;
-    File* file;
-    FlipperHamCfg* c;
+    Storage *storage;
+    File *file;
+    FlipperHamCfg *c;
     uint16_t n;
     uint8_t i;
 
     c = malloc(sizeof(FlipperHamCfg));
-    if(!c) {
-        cfgdefs(app);
+    if (!c)
+    {
+        cfg_defaults(app);
         return;
     }
 
@@ -445,14 +491,15 @@ void cfgload(FlipperHamApp* app)
     storage_common_mkdir(storage, "/ext/apps_data");
     storage_common_mkdir(storage, CFG_DIR);
 
-    if(!storage_file_open(file, CFG_FILE, FSAM_READ, FSOM_OPEN_EXISTING)) {
+    if (!storage_file_open(file, CFG_FILE, FSAM_READ, FSOM_OPEN_EXISTING))
+    {
         storage_file_free(file);
         furi_record_close(RECORD_STORAGE);
         free(c);
-        cfgdefs(app);
+        cfg_defaults(app);
         cfgsave(app);
-        cloadtxt(app);
-        hloadtxt(app);
+        callbook_load_txt(app);
+        ham_load_txt(app);
         return;
     }
 
@@ -461,20 +508,21 @@ void cfgload(FlipperHamApp* app)
     storage_file_free(file);
     furi_record_close(RECORD_STORAGE);
 
-    if(n != sizeof(FlipperHamCfg)) {
+    if (n != sizeof(FlipperHamCfg))
+    {
         free(c);
-        cfgdefs(app);
+        cfg_defaults(app);
         cfgsave(app);
-        cloadtxt(app);
-        hloadtxt(app);
+        callbook_load_txt(app);
+        ham_load_txt(app);
         return;
     }
 
     app->encoding_index = c->encoding_index;
-    app->rf_m = c->rf_m;
-    app->rf_d = c->rf_d;
+    app->rf_mod = c->rf_mod;
+    app->rf_dev = c->rf_dev;
     app->tx_freq_index = c->tx_freq_index;
-    app->d_s = c->d_s;
+    app->dst_ssid = c->dst_ssid;
     app->repeat_n = c->repeat_n;
     app->ham_index = c->ham_index;
     app->leadin_ms = c->leadin_ms;
@@ -501,19 +549,24 @@ void cfgload(FlipperHamApp* app)
     app->pos_n = c->pos_n;
     app->freq_n = c->freq_n;
 
-    if(app->encoding_index >= (sizeof(flipperham_modem_profiles) / sizeof(flipperham_modem_profiles[0])))
+    if (app->encoding_index >=
+        (sizeof(flipperham_modem_profiles) / sizeof(flipperham_modem_profiles[0])))
         app->encoding_index = FlipperHamModemProfileDefault;
 
-    if(app->d_s > 15) app->d_s = 0;
-    if(!app->repeat_n || app->repeat_n > 5) app->repeat_n = 1;
-    if(app->leadin_ms > 1000) app->leadin_ms = 1000;
-    if(app->preamble_ms > 1000) app->preamble_ms = 1000;
+    if (app->dst_ssid > 15)
+        app->dst_ssid = 0;
+    if (!app->repeat_n || app->repeat_n > 5)
+        app->repeat_n = 1;
+    if (app->leadin_ms > 1000)
+        app->leadin_ms = 1000;
+    if (app->preamble_ms > 1000)
+        app->preamble_ms = 1000;
     app->leadin_ms = (app->leadin_ms / 50) * 50;
     app->preamble_ms = (app->preamble_ms / 50) * 50;
 
-    pf(app);
+    preset_fix(app);
 
-    for(i = 0; i < TXT_N; i++)
+    for (i = 0; i < TXT_N; i++)
     {
         app->bulletin[i][TXT_LEN - 1] = 0;
         app->status[i][TXT_LEN - 1] = 0;
@@ -523,108 +576,126 @@ void cfgload(FlipperHamApp* app)
         app->pos_lon[i][POS_LEN - 1] = 0;
     }
 
-    bfix(app);
-    stfix(app);
-    mfix(app);
-    pfix(app);
-    ffix(app);
-    cloadtxt(app);
-    hloadtxt(app);
+    bulletin_fix(app);
+    status_fix(app);
+    message_fix(app);
+    position_fix(app);
+    freq_fix(app);
+    callbook_load_txt(app);
+    ham_load_txt(app);
 
     free(c);
 }
 
-void bfix(FlipperHamApp* app)
+void bulletin_fix(FlipperHamApp *app)
 {
     uint8_t i;
 
     app->bulletin_n = 0;
 
-    for(i = 0; i < TXT_N; i++)
+    for (i = 0; i < TXT_N; i++)
     {
-        if(app->bulletin[i][0]) app->bulletin_used[i] = 1;
-        else app->bulletin_used[i] = 0;
+        if (app->bulletin[i][0])
+            app->bulletin_used[i] = 1;
+        else
+            app->bulletin_used[i] = 0;
 
-        if(app->bulletin_used[i]) app->bulletin_n++;
+        if (app->bulletin_used[i])
+            app->bulletin_n++;
     }
 }
 
-void stfix(FlipperHamApp* app)
+void status_fix(FlipperHamApp *app)
 {
     uint8_t i;
 
     app->status_n = 0;
 
-    for(i = 0; i < TXT_N; i++)
+    for (i = 0; i < TXT_N; i++)
     {
-        if(app->status[i][0]) app->status_used[i] = 1;
-        else app->status_used[i] = 0;
+        if (app->status[i][0])
+            app->status_used[i] = 1;
+        else
+            app->status_used[i] = 0;
 
-        if(app->status_used[i]) app->status_n++;
+        if (app->status_used[i])
+            app->status_n++;
     }
 }
 
-void cfix(FlipperHamApp* app)
+void calls_fix(FlipperHamApp *app)
 {
     uint8_t i;
 
     app->calls_n = 0;
 
-    for(i = 0; i < CALL_N; i++)
+    for (i = 0; i < CALL_N; i++)
     {
-        if(app->calls[i][0]) app->calls_used[i] = 1;
-        else app->calls_used[i] = 0;
+        if (app->calls[i][0])
+            app->calls_used[i] = 1;
+        else
+            app->calls_used[i] = 0;
 
-        if(app->calls_used[i]) app->calls_n++;
+        if (app->calls_used[i])
+            app->calls_n++;
     }
 }
 
-void pfix(FlipperHamApp* app)
+void position_fix(FlipperHamApp *app)
 {
     uint8_t i;
 
     app->pos_n = 0;
 
-    for(i = 0; i < TXT_N; i++)
+    for (i = 0; i < TXT_N; i++)
     {
-        if(pgood(app, i)) app->pos_used[i] = 1;
-        else app->pos_used[i] = 0;
+        if (pos_ok(app, i))
+            app->pos_used[i] = 1;
+        else
+            app->pos_used[i] = 0;
 
-        if(app->pos_used[i]) app->pos_n++;
+        if (app->pos_used[i])
+            app->pos_n++;
     }
 }
 
-void mfix(FlipperHamApp* app)
+void message_fix(FlipperHamApp *app)
 {
     uint8_t i;
 
     app->message_n = 0;
 
-    for(i = 0; i < TXT_N; i++)
+    for (i = 0; i < TXT_N; i++)
     {
-        if(app->message[i][0]) app->message_used[i] = 1;
-        else app->message_used[i] = 0;
+        if (app->message[i][0])
+            app->message_used[i] = 1;
+        else
+            app->message_used[i] = 0;
 
-        if(app->message_used[i]) app->message_n++;
+        if (app->message_used[i])
+            app->message_n++;
     }
 }
 
-void ffix(FlipperHamApp* app)
+void freq_fix(FlipperHamApp *app)
 {
     uint8_t i;
     uint8_t a;
 
     app->freq_n = 0;
 
-    for(i = 0; i < FREQ_N; i++)
+    for (i = 0; i < FREQ_N; i++)
     {
-        if(app->freq[i] && furi_hal_subghz_is_frequency_valid(app->freq[i])) app->freq_used[i] = 1;
-        else app->freq_used[i] = 0;
+        if (app->freq[i] && furi_hal_subghz_is_frequency_valid(app->freq[i]))
+            app->freq_used[i] = 1;
+        else
+            app->freq_used[i] = 0;
 
-        if(app->freq_used[i]) app->freq_n++;
+        if (app->freq_used[i])
+            app->freq_n++;
     }
 
-    if(!app->freq_n)
+    if (!app->freq_n)
     {
         app->freq[0] = CARRIER_HZ;
         app->freq_used[0] = 1;
@@ -633,16 +704,18 @@ void ffix(FlipperHamApp* app)
         return;
     }
 
-    if(app->tx_freq_index < FREQ_N && app->freq_used[app->tx_freq_index]) return;
+    if (app->tx_freq_index < FREQ_N && app->freq_used[app->tx_freq_index])
+        return;
 
-    for(a = 0; a < FREQ_N; a++)
-        if(app->freq_used[a]) {
+    for (a = 0; a < FREQ_N; a++)
+        if (app->freq_used[a])
+        {
             app->tx_freq_index = a;
             return;
         }
 }
 
-bool csplit(const char* s, char* out, uint8_t* ssid, bool* has_ssid)
+bool call_split(const char *s, char *out, uint8_t *ssid, bool *has_ssid)
 {
     char a[CALL_LEN];
     uint8_t i;
@@ -656,23 +729,30 @@ bool csplit(const char* s, char* out, uint8_t* ssid, bool* has_ssid)
     n = 0;
     dash = false;
 
-    while(s[i] && s[i] != '-' && s[i] != '_') {
+    while (s[i] && s[i] != '-' && s[i] != '_')
+    {
         char c = s[i];
 
-        if(c >= 'a' && c <= 'z') c -= 32;
-        if(!((c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9'))) return false;
-        if(j >= CALL_LEN - 1) return false;
+        if (c >= 'a' && c <= 'z')
+            c -= 32;
+        if (!((c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')))
+            return false;
+        if (j >= CALL_LEN - 1)
+            return false;
 
         a[j++] = c;
         i++;
     }
 
-    if(s[i] == '_') dash = true;
-    if(s[i] == '-') dash = true;
+    if (s[i] == '_')
+        dash = true;
+    if (s[i] == '-')
+        dash = true;
 
-    if(!dash && j <= 6)
+    if (!dash && j <= 6)
     {
-        if(!j) return false;
+        if (!j)
+            return false;
         a[j] = 0;
         snprintf(out, CALL_LEN, "%s", a);
         *has_ssid = false;
@@ -680,18 +760,25 @@ bool csplit(const char* s, char* out, uint8_t* ssid, bool* has_ssid)
         return true;
     }
 
-    if(!dash)
+    if (!dash)
     {
         k = j;
-        while(k && a[k - 1] >= '0' && a[k - 1] <= '9') k--;
-        if(k == j) return false;
-        if(k > 6) return false;
-        if(j - k > 2) return false;
-        if(!k) return false;
+        while (k && a[k - 1] >= '0' && a[k - 1] <= '9')
+            k--;
+        if (k == j)
+            return false;
+        if (k > 6)
+            return false;
+        if (j - k > 2)
+            return false;
+        if (!k)
+            return false;
 
         n = 0;
-        for(i = k; i < j; i++) n = (n * 10) + (a[i] - '0');
-        if(n > 15) return false;
+        for (i = k; i < j; i++)
+            n = (n * 10) + (a[i] - '0');
+        if (n > 15)
+            return false;
 
         a[k] = 0;
         snprintf(out, CALL_LEN, "%s", a);
@@ -700,27 +787,36 @@ bool csplit(const char* s, char* out, uint8_t* ssid, bool* has_ssid)
         return true;
     }
 
-    if(j > 6) return false;
-    if(!j) return false;
+    if (j > 6)
+        return false;
+    if (!j)
+        return false;
     i++;
-    if(!s[i]) return false;
+    if (!s[i])
+        return false;
 
     n = 0;
     k = 0;
 
-    while(s[i]) {
+    while (s[i])
+    {
         char c = s[i];
 
-        if(c >= 'a' && c <= 'z') c -= 32;
-        if(c < '0' || c > '9') return false;
+        if (c >= 'a' && c <= 'z')
+            c -= 32;
+        if (c < '0' || c > '9')
+            return false;
         n = (n * 10) + (c - '0');
         k++;
         i++;
     }
 
-    if(!k) return false;
-    if(k > 2) return false;
-    if(n > 15) return false;
+    if (!k)
+        return false;
+    if (k > 2)
+        return false;
+    if (n > 15)
+        return false;
 
     a[j] = 0;
     snprintf(out, CALL_LEN, "%s", a);
@@ -729,7 +825,7 @@ bool csplit(const char* s, char* out, uint8_t* ssid, bool* has_ssid)
     return true;
 }
 
-bool cval(char* s)
+bool call_validate(char *s)
 {
     char a[CALL_LEN];
     uint8_t b;
@@ -737,19 +833,23 @@ bool cval(char* s)
     uint8_t j;
     bool d;
 
-    if(!csplit(s, a, &b, &d)) return false;
+    if (!call_split(s, a, &b, &d))
+        return false;
 
-    if(d)
+    if (d)
     {
         i = 0;
         j = 0;
-        while(a[i]) s[j++] = a[i++];
+        while (a[i])
+            s[j++] = a[i++];
         s[j++] = '-';
-        if(b >= 10) s[j++] = '0' + (b / 10);
+        if (b >= 10)
+            s[j++] = '0' + (b / 10);
         s[j++] = '0' + (b % 10);
         s[j] = 0;
     }
-    else snprintf(s, CALL_LEN, "%s", a);
+    else
+        snprintf(s, CALL_LEN, "%s", a);
 
     return true;
 }
