@@ -2,26 +2,6 @@
 
 #include <string.h>
 
-static void packet_addr(uint8_t *out, const char *call, uint8_t ssid, uint8_t last)
-{
-    int i;
-    const char *s = call;
-
-    for (i = 0; i < 6; i++)
-    {
-        // don't go past short calls; add spaces
-        if (*s)
-        {
-            out[i] = ((uint8_t)*s) << 1;
-            s++;
-        }
-        else
-            out[i] = ' ' << 1;
-    }
-
-    out[6] = 0x60 | ((ssid & 15) << 1) | (last ? 1 : 0);
-}
-
 static uint16_t packet_crc(const uint8_t *data, uint16_t len)
 {
     uint16_t crc = 0xFFFF;
@@ -57,37 +37,6 @@ static void packet_push_byte_bits(uint8_t *out, uint16_t *n, uint8_t v)
 void packet_init(Packet *p)
 {
     memset(p, 0, sizeof(Packet));
-}
-
-void packet_make_payload(Packet *p, const char *s)
-{
-    uint16_t i = 0;
-
-    p->payload[0] = '>';
-    p->payload_len = 1;
-
-    while (s[i] && p->payload_len < sizeof(p->payload))
-    {
-        p->payload[p->payload_len++] = (uint8_t)s[i];
-        i++;
-    }
-}
-
-void packet_make_ax25(Packet *p, const char *from, uint8_t from_ssid, const char *to,
-                      uint8_t to_ssid)
-{
-    uint16_t i;
-
-    packet_addr(p->ax25 + 0, to, to_ssid, 0);
-    packet_addr(p->ax25 + 7, from, from_ssid, 1);
-    p->ax25[14] = 0x03;
-    p->ax25[15] = 0xF0;
-    p->ax25_len = 16;
-
-    for (i = 0; i < p->payload_len && p->ax25_len < sizeof(p->ax25); i++)
-    {
-        p->ax25[p->ax25_len++] = p->payload[i];
-    }
 }
 
 void packet_add_fcs(Packet *p)
@@ -153,15 +102,4 @@ void packet_nrzi(Packet *p)
             level ^= 1;
         p->nrzi[p->nrzi_len++] = level;
     }
-}
-
-void packet_do_all(Packet *p, const char *from, uint8_t from_ssid, const char *to, uint8_t to_ssid,
-                   const char *s)
-{
-    packet_init(p);
-    packet_make_payload(p, s);
-    packet_make_ax25(p, from, from_ssid, to, to_ssid);
-    packet_add_fcs(p);
-    packet_stuff(p);
-    packet_nrzi(p);
 }

@@ -257,14 +257,11 @@ static bool wave_flag(FlipperHamApp *app)
 void txstart(FlipperHamApp *app)
 {
     char message[96];
-    char bulletin_id;
     char dst[CALL_LEN];
-    char dst_full[CALL_LEN];
     const FlipperHamModemProfile *p;
     const char *src;
     uint16_t i;
     uint16_t n;
-    uint8_t j;
     uint8_t src_ssid;
     uint8_t ssid;
     bool has_ssid;
@@ -300,15 +297,9 @@ void txstart(FlipperHamApp *app)
             return;
         if (!app->bulletin[app->tx_msg_index][0])
             return;
-
-        bulletin_id = '0';
-        if (app->tx_msg_index < 10)
-            bulletin_id = '0' + app->tx_msg_index;
-        else if (app->tx_msg_index < 16)
-            bulletin_id = 'A' + (app->tx_msg_index - 10);
-
-        snprintf(message, sizeof(message), ":BLN%c     :%s", bulletin_id,
-                 app->bulletin[app->tx_msg_index]);
+        if (!aprs_bulletin(message, sizeof(message), app->tx_msg_index,
+                           app->bulletin[app->tx_msg_index]))
+            return;
     }
     else if (app->tx_type == 1)
     {
@@ -316,8 +307,8 @@ void txstart(FlipperHamApp *app)
             return;
         if (!app->status[app->tx_msg_index][0])
             return;
-
-        snprintf(message, sizeof(message), ">%s", app->status[app->tx_msg_index]);
+        if (!aprs_status(message, sizeof(message), app->status[app->tx_msg_index]))
+            return;
     }
     else if (app->tx_type == 3)
     {
@@ -350,20 +341,8 @@ void txstart(FlipperHamApp *app)
             return;
         if (!has_ssid)
             ssid = app->dst_ssid;
-
-        j = 0;
-        while (dst[j])
-        {
-            dst_full[j] = dst[j];
-            j++;
-        }
-        dst_full[j++] = '-';
-        if (ssid >= 10)
-            dst_full[j++] = '0' + (ssid / 10);
-        dst_full[j++] = '0' + (ssid % 10);
-        dst_full[j] = 0;
-
-        snprintf(message, sizeof(message), ":%-9s:%s", dst_full, app->message[app->tx_msg_index]);
+        if (!aprs_message(message, sizeof(message), dst, ssid, app->message[app->tx_msg_index]))
+            return;
     }
 
     src = MY_CALL;
@@ -378,13 +357,8 @@ void txstart(FlipperHamApp *app)
                     src_ssid = app->ham_ssid[app->ham_index];
             }
 
-    packet_init(app->pkt);
-    snprintf((char *)app->pkt->payload, sizeof(app->pkt->payload), "%s", message);
-    app->pkt->payload_len = strlen((char *)app->pkt->payload);
-    packet_make_ax25(app->pkt, src, src_ssid, MY_TOCALL, 0);
-    packet_add_fcs(app->pkt);
-    packet_stuff(app->pkt);
-    packet_nrzi(app->pkt);
+    if (!aprs_packet(app->pkt, src, src_ssid, MY_TOCALL, 0, message))
+        return;
 
     if (app->leadin_ms)
     {

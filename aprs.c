@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 static int aprs_coord(char *out, uint16_t n, const char *s, uint8_t lon)
 {
@@ -80,6 +81,20 @@ static int aprs_coord(char *out, uint16_t n, const char *s, uint8_t lon)
     return snprintf(out, n, "%02d%02d.%02d%c", degrees, whole_minutes, minute_hundredths, hemi);
 }
 
+static void aprs_addr(uint8_t *out, const char *call, uint8_t ssid, uint8_t last)
+{
+    int i;
+    const char *a = call;
+
+    for (i = 0; i < 6; i++)
+    {
+        if (*a) { out[i] = ((uint8_t)*a) << 1; a++; }
+        else out[i] = ' ' << 1;
+    }
+
+    out[6] = 0x60 | ((ssid & 15) << 1) | (last ? 1 : 0);
+}
+
 int aprs_ll_clamp(char *out, uint16_t n, const char *s, uint8_t lon)
 {
     float value;
@@ -143,6 +158,88 @@ int aprs_pos(char *out, uint16_t n, const char *name, const char *lat, const cha
     if (aprs_lon(b, sizeof(b), lon) <= 0)
         return 0;
     return snprintf(out, n, "!%s/%s-%s", a, b, name ? name : "");
+}
+
+
+int aprs_bulletin(char *out, uint16_t n, uint8_t index, const char *text)
+{
+    char a;
+
+    a = '0';
+    if (index < 10) a = '0' + index;
+    else if (index < 16) a = 'A' + (index - 10);
+
+    return snprintf(out, n, ":BLN%c     :%s", a, text ? text : "");
+}
+
+
+int aprs_status(char *out, uint16_t n, const char *text)
+{
+    return snprintf(out, n, ">%s", text ? text : "");
+}
+
+
+int aprs_message(char *out, uint16_t n, const char *dst, uint8_t ssid, const char *text)
+{
+    char a[12];
+    uint8_t i;
+    uint8_t b;
+
+    if (!out || !n || !dst) return 0;
+
+    b = sizeof(a);
+    i = 0;
+
+    while (dst[i] && i + 1 < b)
+    {
+        a[i] = dst[i];
+        i++;
+    }
+
+    if (i + 1 >= b) return 0;
+    a[i++] = '-';
+
+    if (ssid >= 10)
+    {
+        if (i + 1 >= b) return 0;
+        a[i++] = '0' + (ssid / 10);
+    }
+
+    if (i + 1 >= b) return 0;
+    a[i++] = '0' + (ssid % 10);
+    a[i] = 0;
+
+    return snprintf(out, n, ":%-9s:%s", a, text ? text : "");
+}
+
+
+bool aprs_packet(Packet *p, const char *from, uint8_t from_ssid, const char *to, uint8_t to_ssid,
+                 const char *payload)
+{
+    uint16_t i;
+
+    if (!p || !from || !to || !payload) return false;
+
+    packet_init(p);
+
+    snprintf((char *)p->payload, sizeof(p->payload), "%s", payload);
+    p->payload_len = strlen((char *)p->payload);
+
+
+    aprs_addr(p->ax25 + 0, to, to_ssid, 0);
+    aprs_addr(p->ax25 + 7, from, from_ssid, 1);
+    p->ax25[14] = 0x03;
+    p->ax25[15] = 0xF0;
+    p->ax25_len = 16;
+
+    for (i = 0; i < p->payload_len && p->ax25_len < sizeof(p->ax25); i++) p->ax25[p->ax25_len++] = p->payload[i];
+
+
+    packet_add_fcs(p);
+    packet_stuff(p);
+    packet_nrzi(p);
+
+    return true;
 }
 
 bool call_crc(const char* s, uint16_t ptr)
