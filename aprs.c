@@ -160,71 +160,72 @@ int aprs_pos(char *out, uint16_t n, const char *name, const char *lat, const cha
     return snprintf(out, n, "!%s/%s-%s", a, b, name ? name : "");
 }
 
-
 int aprs_bulletin(char *out, uint16_t n, uint8_t index, const char *text)
 {
-    char a;
+    char bulletin_id;
 
-    a = '0';
-    if (index < 10) a = '0' + index;
-    else if (index < 16) a = 'A' + (index - 10);
+    bulletin_id = '0';
+    if (index < 10)
+        bulletin_id = '0' + index;
+    else if (index < 16)
+        bulletin_id = 'A' + (index - 10);
 
-    return snprintf(out, n, ":BLN%c     :%s", a, text ? text : "");
+    return snprintf(out, n, ":BLN%c     :%s", bulletin_id, text ? text : "");
 }
-
 
 int aprs_status(char *out, uint16_t n, const char *text)
 {
     return snprintf(out, n, ">%s", text ? text : "");
 }
 
-
 int aprs_message(char *out, uint16_t n, const char *dst, uint8_t ssid, const char *text)
 {
-    char a[12];
+    char dst_full[12];
     uint8_t i;
-    uint8_t b;
+    uint8_t dst_len;
 
-    if (!out || !n || !dst) return 0;
+    if (!out || !n || !dst)
+        return 0;
 
-    b = sizeof(a);
+    dst_len = sizeof(dst_full);
     i = 0;
 
-    while (dst[i] && i + 1 < b)
+    while (dst[i] && i + 1 < dst_len)
     {
-        a[i] = dst[i];
+        dst_full[i] = dst[i];
         i++;
     }
 
-    if (i + 1 >= b) return 0;
-    a[i++] = '-';
+    if (i + 1 >= dst_len)
+        return 0;
+    dst_full[i++] = '-';
 
     if (ssid >= 10)
     {
-        if (i + 1 >= b) return 0;
-        a[i++] = '0' + (ssid / 10);
+        if (i + 1 >= dst_len)
+            return 0;
+        dst_full[i++] = '0' + (ssid / 10);
     }
 
-    if (i + 1 >= b) return 0;
-    a[i++] = '0' + (ssid % 10);
-    a[i] = 0;
+    if (i + 1 >= dst_len)
+        return 0;
+    dst_full[i++] = '0' + (ssid % 10);
+    dst_full[i] = 0;
 
-    return snprintf(out, n, ":%-9s:%s", a, text ? text : "");
+    return snprintf(out, n, ":%-9s:%s", dst_full, text ? text : "");
 }
-
 
 bool aprs_packet(Packet *p, const char *from, uint8_t from_ssid, const char *to, uint8_t to_ssid,
                  const char *payload)
 {
     uint16_t i;
 
-    if (!p || !from || !to || !payload) return false;
+    if (!p || !from || !to || !payload)
+        return false;
 
     packet_init(p);
-
     snprintf((char *)p->payload, sizeof(p->payload), "%s", payload);
     p->payload_len = strlen((char *)p->payload);
-
 
     aprs_addr(p->ax25 + 0, to, to_ssid, 0);
     aprs_addr(p->ax25 + 7, from, from_ssid, 1);
@@ -232,14 +233,54 @@ bool aprs_packet(Packet *p, const char *from, uint8_t from_ssid, const char *to,
     p->ax25[15] = 0xF0;
     p->ax25_len = 16;
 
-    for (i = 0; i < p->payload_len && p->ax25_len < sizeof(p->ax25); i++) p->ax25[p->ax25_len++] = p->payload[i];
-
+    for (i = 0; i < p->payload_len && p->ax25_len < sizeof(p->ax25); i++)
+        p->ax25[p->ax25_len++] = p->payload[i];
 
     packet_add_fcs(p);
     packet_stuff(p);
     packet_nrzi(p);
-
     return true;
+}
+
+void packet_make_payload(Packet *p, const char *s)
+{
+    uint16_t i;
+
+    packet_init(p);
+    p->payload[0] = '>';
+    p->payload_len = 1;
+
+    i = 0;
+    while (s && s[i] && p->payload_len < sizeof(p->payload))
+    {
+        p->payload[p->payload_len++] = (uint8_t)s[i];
+        i++;
+    }
+}
+
+void packet_make_ax25(Packet *p, const char *from, uint8_t from_ssid, const char *to,
+                      uint8_t to_ssid)
+{
+    uint16_t i;
+
+    aprs_addr(p->ax25 + 0, to, to_ssid, 0);
+    aprs_addr(p->ax25 + 7, from, from_ssid, 1);
+    p->ax25[14] = 0x03;
+    p->ax25[15] = 0xF0;
+    p->ax25_len = 16;
+
+    for (i = 0; i < p->payload_len && p->ax25_len < sizeof(p->ax25); i++)
+        p->ax25[p->ax25_len++] = p->payload[i];
+}
+
+void packet_do_all(Packet *p, const char *from, uint8_t from_ssid, const char *to, uint8_t to_ssid,
+                   const char *s)
+{
+    packet_make_payload(p, s);
+    packet_make_ax25(p, from, from_ssid, to, to_ssid);
+    packet_add_fcs(p);
+    packet_stuff(p);
+    packet_nrzi(p);
 }
 
 bool call_crc(const char* s, uint16_t ptr)
