@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "../aprs.h"
+#include "../src/aprs.h"
 
 int main(void)
 {
