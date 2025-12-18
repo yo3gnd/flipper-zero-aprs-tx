@@ -7,6 +7,7 @@
 #include <gui/modules/text_input.h>
 #include <gui/modules/variable_item_list.h>
 #include <gui/modules/widget.h>
+#include <gui/view.h>
 #include <gui/view_dispatcher.h>
 #include <gui/gui.h>
 #include <gui/view_port.h>
@@ -33,6 +34,9 @@ typedef struct FlipperHamApp
     VariableItemList *pos_edit_menu;
     TextInput *text_input;
     Widget *readme_widget;
+    View *splash_view;
+    FuriTimer *splash_timer;
+    FuriTimer *splash_cycle_timer;
     ViewPort *view_port;
     volatile uint16_t wave_i;
     volatile bool level;
@@ -69,6 +73,8 @@ typedef struct FlipperHamApp
     uint32_t repeat_t0;
     uint32_t repeat_to;
     uint8_t return_view;
+    uint8_t splash_next_view;
+    bool splash_back_exit;
     char bulletin[TXT_N][TXT_LEN];
     char status[TXT_N][TXT_LEN];
     char message[TXT_N][TXT_LEN];

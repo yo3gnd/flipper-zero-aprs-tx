@@ -404,7 +404,11 @@ void flipperham_menu_callback(void *context, uint32_t index)
     if (index == FlipperHamMenuIndexHam)
         view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewHam);
     if (index == FlipperHamMenuIndexReadme)
-        view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewReadme);
+    {
+        app->splash_next_view = FlipperHamViewReadme;
+        app->splash_back_exit = false;
+        view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewSplash);
+    }
 }
 
 void readme_back(GuiButtonType result, InputType type, void *context)
