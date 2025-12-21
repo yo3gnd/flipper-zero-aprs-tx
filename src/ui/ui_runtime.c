@@ -272,9 +272,9 @@ FlipperHamApp *flipperham_app_alloc(void)
     app->c2_h[0] = 0;
     app->f_edit[0] = 0;
     app->f_bad = false;
-    app->return_view = FlipperHamViewSplash;
+    app->return_view = FlipperHamViewMenu;
+    app->splash_mode = 0;
     app->splash_next_view = FlipperHamViewMenu;
-    app->splash_back_exit = true;
     app->text_mode = 0;
     app->text_view = FlipperHamViewMenu;
     app->pkt = NULL;
@@ -284,6 +284,7 @@ FlipperHamApp *flipperham_app_alloc(void)
 
     view_dispatcher_attach_to_gui(app->view_dispatcher, app->gui, ViewDispatcherTypeFullscreen);
     splash_view_alloc(app);
+    app->return_view = splash_startup_view(app);
 
     submenu_add_item(app->submenu, "Send", FlipperHamMenuIndexSend, flipperham_menu_callback, app);
     submenu_add_item(app->submenu, "Settings", FlipperHamMenuIndexSettings,

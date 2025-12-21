@@ -1,13 +1,38 @@
 #include "ui_splash.h"
 #include "ui_i.h"
 
+#include <furi_hal.h>
 #include <gui/elements.h>
+#include <storage/storage.h>
+
+#define SPLASH_META_FILE "/ext/ham/aprstx.meta"
 
 enum
 {
-    SplashCustomEventShowNext = 1,
-    SplashCustomEventFooterTick,
+    SplashModeStartup = 0,
+    SplashModeRequest,
 };
+
+enum
+{
+    SplashEntryWebsite = 0,
+    SplashEntryInstagram,
+    SplashEntryTiktok,
+    SplashEntryGithub,
+    SplashEntryYoutube,
+};
+
+enum
+{
+    SplashCustomEventAllowInput = 1,
+    SplashCustomEventTick,
+};
+
+typedef struct
+{
+    uint32_t a;
+    uint32_t b;
+} SplashMeta;
 
 typedef struct
 {
@@ -25,10 +50,14 @@ typedef struct
 
 typedef struct
 {
-    bool allow_next_button;
+    bool allow_input;
     bool show_next_button;
     uint8_t footer_i;
+    uint8_t footer_next_i;
+    uint8_t footer_seq_i;
+    uint8_t footer_phase;
 } SplashModel;
+
 /* Previous custom chunky logo, kept around in case we want to switch back.
 static const uint8_t splash_yo3gnd_blocky[] = {
     0x03, 0xc3, 0x0f, 0xff, 0xc0, 0x0f, 0x03, 0xf3, 0x0f,
@@ -217,10 +246,7 @@ static const SplashText splash_text_github_com = { splash_github_com, 59, 11, 0 
 static const SplashText splash_text_yo3gnd_pad = { splash_yo3gnd_pad, 42, 10, 0 };
 static const SplashText splash_text_youtube = { splash_youtube, 41, 10, 0 };
 
-static const SplashFooter splash_footer_seq[] = {
-    { &splash_text_www_yo3gnd, &splash_text_website },
-    { &splash_text_at_yo3gnd, &splash_text_instagram },
-    { &splash_text_at_yo3gnd, &splash_text_tiktok },
+static const SplashFooter splash_footer[] = {
     { &splash_text_www_yo3gnd, &splash_text_website },
     { &splash_text_at_yo3gnd, &splash_text_instagram },
     { &splash_text_at_yo3gnd, &splash_text_tiktok },
@@ -228,13 +254,159 @@ static const SplashFooter splash_footer_seq[] = {
     { &splash_text_at_yo3gnd, &splash_text_youtube },
 };
 
+static const uint8_t splash_request_seq[] = {
+    SplashEntryWebsite,
+    SplashEntryInstagram,
+    SplashEntryTiktok,
+    SplashEntryWebsite,
+    SplashEntryInstagram,
+    SplashEntryTiktok,
+    SplashEntryGithub,
+    SplashEntryYoutube,
+};
+
+static uint32_t splash_date_pack(const DateTime *dt)
+{
+    uint32_t a;
+
+    a = ((uint32_t)(dt->year - 2000U) << 9) | ((uint32_t)dt->month << 5) | (uint32_t)dt->day;
+
+
+    return a;
+}
+
+static uint32_t splash_date_spin(uint32_t a)
+{
+    a = (a << 7) | (a >> 25);
+
+
+    return a;
+}
+
+static bool splash_date_valid(uint32_t a)
+{
+    uint8_t m, d;
+
+    m = (a >> 5) & 0x0f;
+    d = a & 0x1f;
+    if (!m || m > 12)
+        return false;
+    if (!d || d > 31)
+        return false;
+
+
+    return true;
+}
+
+static bool splash_meta_parse(SplashMeta *meta, uint32_t *date)
+{
+    uint32_t a, b;
+
+    a = meta->a ^ 0x51a92e73UL;
+    b = splash_date_spin(a) ^ 0x7c38d41fUL;
+    if (meta->b != b)
+        return false;
+    if (!splash_date_valid(a))
+        return false;
+
+    *date = a;
+
+
+    return true;
+}
+
+static void splash_meta_make(const DateTime *dt, SplashMeta *meta)
+{
+    uint32_t a;
+
+    a = splash_date_pack(dt);
+    meta->a = a ^ 0x51a92e73UL;
+    meta->b = splash_date_spin(a) ^ 0x7c38d41fUL;
+}
+
+static bool splash_meta_read(uint32_t *date)
+{
+    Storage *storage;
+    File *file;
+    SplashMeta meta;
+    bool ok;
+
+    ok = false;
+    storage = furi_record_open(RECORD_STORAGE);
+    file = storage_file_alloc(storage);
+
+    if (!storage_file_open(file, SPLASH_META_FILE, FSAM_READ, FSOM_OPEN_EXISTING))
+        goto x;
+    if (storage_file_size(file) != sizeof(SplashMeta))
+        goto x;
+    if (storage_file_read(file, &meta, sizeof(SplashMeta)) != sizeof(SplashMeta))
+        goto x;
+    ok = splash_meta_parse(&meta, date);
+
+x:
+    storage_file_close(file);
+    storage_file_free(file);
+    furi_record_close(RECORD_STORAGE);
+
+
+    return ok;
+}
+
+static void splash_meta_write(const DateTime *dt)
+{
+    Storage *storage;
+    File *file;
+    SplashMeta meta;
+
+    storage = furi_record_open(RECORD_STORAGE);
+    file = storage_file_alloc(storage);
+    splash_meta_make(dt, &meta);
+
+    storage_common_mkdir(storage, CALLBOOK_DIR);
+    if (storage_file_open(file, SPLASH_META_FILE, FSAM_WRITE, FSOM_CREATE_ALWAYS))
+        storage_file_write(file, &meta, sizeof(SplashMeta));
+
+    storage_file_close(file);
+    storage_file_free(file);
+    furi_record_close(RECORD_STORAGE);
+}
+
+static uint8_t splash_other_pick(uint8_t day)
+{
+    day %= 3;
+    if (day == 1)
+        return SplashEntryGithub;
+    if (day == 2)
+        return SplashEntryYoutube;
+
+
+    return SplashEntryWebsite;
+}
+
+static uint8_t splash_social_pick(uint8_t day)
+{
+    if ((day & 1) == 0)
+        return SplashEntryInstagram;
+
+
+    return SplashEntryTiktok;
+}
+
+static uint8_t splash_request_start(uint8_t day)
+{
+    day %= sizeof(splash_request_seq) / sizeof(splash_request_seq[0]);
+
+
+    return day;
+}
+
 static void splash_footer_draw(Canvas *canvas, uint8_t footer_i)
 {
     const SplashFooter *f;
     int y;
     int x;
 
-    f = &splash_footer_seq[footer_i % (sizeof(splash_footer_seq) / sizeof(splash_footer_seq[0]))];
+    f = &splash_footer[footer_i % (sizeof(splash_footer) / sizeof(splash_footer[0]))];
     y = 36;
 
     x = 32 + (96 - f->a->w) / 2;
@@ -254,8 +426,16 @@ static void splash_draw(Canvas *canvas, void *model)
     canvas_draw_xbm(canvas, 45, 8, 70, 16, splash_yo3gnd);
     splash_footer_draw(canvas, m->footer_i);
 
-    if (m->allow_next_button && m->show_next_button)
+    if (m->show_next_button)
         elements_button_right(canvas, "Next");
+}
+
+static void splash_go_next(FlipperHamApp *app)
+{
+    if (app->splash_mode == SplashModeStartup)
+        app->return_view = app->splash_next_view;
+
+    view_dispatcher_switch_to_view(app->view_dispatcher, app->splash_next_view);
 }
 
 static void splash_timer(void *context)
@@ -264,7 +444,7 @@ static void splash_timer(void *context)
 
     if (!app)
         return;
-    view_dispatcher_send_custom_event(app->view_dispatcher, SplashCustomEventShowNext);
+    view_dispatcher_send_custom_event(app->view_dispatcher, SplashCustomEventAllowInput);
 }
 
 static void splash_cycle_timer(void *context)
@@ -273,20 +453,22 @@ static void splash_cycle_timer(void *context)
 
     if (!app)
         return;
-    view_dispatcher_send_custom_event(app->view_dispatcher, SplashCustomEventFooterTick);
+    view_dispatcher_send_custom_event(app->view_dispatcher, SplashCustomEventTick);
 }
 
 static bool splash_custom(uint32_t event, void *context)
 {
     FlipperHamApp *app = context;
+    bool done;
 
-    if (event == SplashCustomEventShowNext)
+    if (event == SplashCustomEventAllowInput)
     {
         with_view_model(
             app->splash_view,
             SplashModel *m,
             {
-                if (m->allow_next_button)
+                m->allow_input = true;
+                if (app->splash_mode == SplashModeRequest)
                     m->show_next_button = true;
             },
             true);
@@ -294,45 +476,82 @@ static bool splash_custom(uint32_t event, void *context)
         return true;
     }
 
-    if (event == SplashCustomEventFooterTick)
+    if (event != SplashCustomEventTick)
+        return false;
+
+    if (app->splash_mode == SplashModeRequest)
     {
         with_view_model(
             app->splash_view,
             SplashModel *m,
             {
-                m->footer_i++;
-                if (m->footer_i >= sizeof(splash_footer_seq) / sizeof(splash_footer_seq[0]))
-                    m->footer_i = 0;
+                m->footer_seq_i++;
+                if (m->footer_seq_i >= sizeof(splash_request_seq) / sizeof(splash_request_seq[0]))
+                    m->footer_seq_i = 0;
+                m->footer_i = splash_request_seq[m->footer_seq_i];
             },
             true);
 
         return true;
     }
 
-    return false;
+    done = false;
+    with_view_model(
+        app->splash_view,
+        SplashModel *m,
+        {
+            if (!m->footer_phase)
+            {
+                m->footer_i = m->footer_next_i;
+                m->footer_phase = 1;
+            }
+            else
+            {
+                done = true;
+            }
+        },
+        true);
+    if (done)
+        splash_go_next(app);
+
+
+    return true;
 }
 
 static void splash_enter(void *context)
 {
     FlipperHamApp *app = context;
-    bool show_next;
+    DateTime dt;
 
-    show_next = app->splash_next_view == FlipperHamViewReadme && !app->splash_back_exit;
-
+    furi_hal_rtc_get_datetime(&dt);
     with_view_model(
         app->splash_view,
         SplashModel *m,
         {
-            m->allow_next_button = show_next;
+            m->allow_input = false;
             m->show_next_button = false;
-            m->footer_i = 0;
+            m->footer_phase = 0;
+            m->footer_seq_i = 0;
+            if (app->splash_mode == SplashModeStartup)
+            {
+                m->footer_i = splash_social_pick(dt.day);
+                m->footer_next_i = splash_other_pick(dt.day);
+            }
+            else
+            {
+                m->footer_seq_i = splash_request_start(dt.day);
+                m->footer_i = splash_request_seq[m->footer_seq_i];
+                m->footer_next_i = 0;
+            }
         },
         true);
 
-    if (show_next && app->splash_timer)
+    if (app->splash_timer)
         furi_timer_start(app->splash_timer, furi_ms_to_ticks(1000));
-    if (app->splash_cycle_timer)
-        furi_timer_start(app->splash_cycle_timer, furi_ms_to_ticks(1000));
+    if (app->splash_cycle_timer && app->splash_mode == SplashModeStartup)
+        furi_timer_start(app->splash_cycle_timer, furi_ms_to_ticks(2000));
+    if (app->splash_cycle_timer && app->splash_mode == SplashModeRequest)
+        furi_timer_start(app->splash_cycle_timer, furi_ms_to_ticks(1500));
 }
 
 static void splash_exit(void *context)
@@ -348,9 +567,12 @@ static void splash_exit(void *context)
         app->splash_view,
         SplashModel *m,
         {
-            m->allow_next_button = false;
+            m->allow_input = false;
             m->show_next_button = false;
             m->footer_i = 0;
+            m->footer_next_i = 0;
+            m->footer_seq_i = 0;
+            m->footer_phase = 0;
         },
         false);
 }
@@ -358,35 +580,55 @@ static void splash_exit(void *context)
 static bool splash_input(InputEvent *event, void *context)
 {
     FlipperHamApp *app = context;
-    bool wait_next;
+    bool wait_more;
 
     if (event->type != InputTypeShort)
         return false;
 
-    wait_next = false;
+    wait_more = true;
     with_view_model(
         app->splash_view,
         SplashModel *m,
         {
-            if (m->allow_next_button && !m->show_next_button)
-                wait_next = true;
+            if (m->allow_input)
+                wait_more = false;
         },
         false);
-
-    if (wait_next)
+    if (wait_more)
         return true;
 
-    if (event->key == InputKeyBack)
-    {
-        if (app->splash_back_exit)
-            view_dispatcher_stop(app->view_dispatcher);
-        else
-            view_dispatcher_switch_to_view(app->view_dispatcher, app->splash_next_view);
-        return true;
-    }
+    splash_go_next(app);
 
-    view_dispatcher_switch_to_view(app->view_dispatcher, app->splash_next_view);
+
     return true;
+}
+
+uint8_t splash_startup_view(FlipperHamApp *app)
+{
+    DateTime dt;
+    uint32_t today, saved;
+
+    app->splash_mode = SplashModeStartup;
+    app->splash_next_view = FlipperHamViewMenu;
+
+    furi_hal_rtc_get_datetime(&dt);
+    today = splash_date_pack(&dt);
+    if (splash_meta_read(&saved) && saved == today)
+        return FlipperHamViewMenu;
+
+    splash_meta_write(&dt);
+
+
+    return FlipperHamViewSplash;
+}
+
+void splash_request_mode(FlipperHamApp *app)
+{
+    app->splash_mode = SplashModeRequest;
+    app->splash_next_view = FlipperHamViewReadme;
+
+
+    return;
 }
 
 void splash_view_alloc(FlipperHamApp *app)
@@ -406,9 +648,12 @@ void splash_view_alloc(FlipperHamApp *app)
         app->splash_view,
         SplashModel *m,
         {
-            m->allow_next_button = false;
+            m->allow_input = false;
             m->show_next_button = false;
             m->footer_i = 0;
+            m->footer_next_i = 0;
+            m->footer_seq_i = 0;
+            m->footer_phase = 0;
         },
         true);
 }
