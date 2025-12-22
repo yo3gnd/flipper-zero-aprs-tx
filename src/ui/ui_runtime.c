@@ -1,7 +1,7 @@
 #include "ui_i.h"
+#include "ui_splash.h"
 
 #include <furi_hal.h>
-#include <gui/view.h>
 #include <notification/notification.h>
 #include <notification/notification_messages.h>
 
@@ -31,10 +31,12 @@ void flipperham_status_view_free(FlipperHamApp *app)
     app->view_port = NULL;
 }
 
+
 void flipperham_menu_free(FlipperHamApp *app)
 {
     if (app->view_dispatcher)
     {
+        view_dispatcher_remove_view(app->view_dispatcher, FlipperHamViewSplash);
         view_dispatcher_remove_view(app->view_dispatcher, FlipperHamViewMenu);
         view_dispatcher_remove_view(app->view_dispatcher, FlipperHamViewSend);
         view_dispatcher_remove_view(app->view_dispatcher, FlipperHamViewSettings);
@@ -164,6 +166,8 @@ void flipperham_menu_free(FlipperHamApp *app)
         text_input_free(app->text_input);
         app->text_input = NULL;
     }
+
+    splash_view_free(app);
 }
 
 static void stin(InputEvent *event, void *context)
@@ -220,6 +224,9 @@ FlipperHamApp *flipperham_app_alloc(void)
     app->pos_edit_menu = variable_item_list_alloc();
     app->text_input = text_input_alloc();
     app->readme_widget = widget_alloc();
+    app->splash_view = NULL;
+    app->splash_timer = NULL;
+    app->splash_cycle_timer = NULL;
 
     app->view_port = NULL;
     app->tx_started = false;
@@ -266,6 +273,8 @@ FlipperHamApp *flipperham_app_alloc(void)
     app->f_edit[0] = 0;
     app->f_bad = false;
     app->return_view = FlipperHamViewMenu;
+    app->splash_mode = 0;
+    app->splash_next_view = FlipperHamViewMenu;
     app->text_mode = 0;
     app->text_view = FlipperHamViewMenu;
     app->pkt = NULL;
@@ -274,6 +283,8 @@ FlipperHamApp *flipperham_app_alloc(void)
     cfgload(app);
 
     view_dispatcher_attach_to_gui(app->view_dispatcher, app->gui, ViewDispatcherTypeFullscreen);
+    splash_view_alloc(app);
+    app->return_view = splash_startup_view(app);
 
     submenu_add_item(app->submenu, "Send", FlipperHamMenuIndexSend, flipperham_menu_callback, app);
     submenu_add_item(app->submenu, "Settings", FlipperHamMenuIndexSettings,
@@ -308,10 +319,10 @@ FlipperHamApp *flipperham_app_alloc(void)
     ham_tx_menu_build(app);
     widget_add_text_scroll_element(
         app->readme_widget, 0, 0, 128, 52,
-        "www.yo3gnd.ro\n\nAPRS experimental transmiter for Flipper. Don't transmit where you "
-        "shouldn't. Uses FSK as a weak substitute for FM. Works, sometimes.\n\nI'm quite "
-        "interested on what kind of hardware and with what parameters you got decodes - reports "
-        "are appreciated");
+        "APRS experimental transmiter for Flipper. Don't transmit where you shouldn't. Uses FSK "
+        "as a weak substitute for FM. Works, sometimes.\n\nI'm quite interested on what kind of "
+        "hardware and with what parameters you got decodes.\n\nReports are really appreciated. Contact "
+        "me at:\n\nwww.yo3gnd.ro\nyo3gnd@gmail.com\ngithub.com/yo3gnd\ninstagram: @yo3gnd\ntiktok: @yo3ngd\nyoutube.com/@yo3gnd\n\n");
     widget_add_button_element(app->readme_widget, GuiButtonTypeLeft, "Back", readme_back, app);
 
     view_set_previous_callback(submenu_get_view(app->submenu), flipperham_exit_callback);
@@ -349,6 +360,7 @@ FlipperHamApp *flipperham_app_alloc(void)
     variable_item_list_set_enter_callback(app->freq_edit_menu, freq_edit_enter, app);
     variable_item_list_set_enter_callback(app->pos_edit_menu, pos_edit_enter, app);
 
+    view_dispatcher_add_view(app->view_dispatcher, FlipperHamViewSplash, app->splash_view);
     view_dispatcher_add_view(app->view_dispatcher, FlipperHamViewMenu,
                              submenu_get_view(app->submenu));
     view_dispatcher_add_view(app->view_dispatcher, FlipperHamViewSend,

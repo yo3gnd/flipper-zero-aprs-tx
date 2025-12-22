@@ -1,4 +1,5 @@
 #include "ui_i.h"
+#include "ui_splash.h"
 
 #include <furi_hal.h>
 #include <gui/view.h>
@@ -404,7 +405,10 @@ void flipperham_menu_callback(void *context, uint32_t index)
     if (index == FlipperHamMenuIndexHam)
         view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewHam);
     if (index == FlipperHamMenuIndexReadme)
-        view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewReadme);
+    {
+        splash_request_mode(app);
+        view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewSplash);
+    }
 }
 
 void readme_back(GuiButtonType result, InputType type, void *context)

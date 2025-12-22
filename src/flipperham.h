@@ -77,6 +77,7 @@ enum
     FlipperHamViewHam,
     FlipperHamViewHamTx,
     FlipperHamViewReadme,
+    FlipperHamViewSplash,
 };
 
 enum
