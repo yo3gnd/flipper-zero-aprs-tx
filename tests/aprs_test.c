@@ -139,7 +139,7 @@ int main(void)
     if (aprs_bulletin(c, sizeof(c), 3, "pj6y bln") == (int)strlen(":BLN3     :pj6y bln") &&
         !strcmp(c, ":BLN3     :pj6y bln")) ok++;
     else { bad++; printf("bad bln pj6y %s\n", c); }
-    if (aprs_packet(&p, "PJ6Y", 0, "APZFLP", 0, c)) ok++;
+    if (aprs_packet(&p, "PJ6Y", 0, "APZFLP", 0, c, NULL)) ok++;
     else { bad++; printf("bad packet pj6y\n"); }
     if (p.ax25_len == sizeof(ax_pj6y)) ok++;
     else { bad++; printf("bad len pj6y %u\n", (unsigned)p.ax25_len); }
@@ -155,7 +155,7 @@ int main(void)
 
     if (aprs_status(c, sizeof(c), "yp0ta up") == (int)strlen(">yp0ta up") && !strcmp(c, ">yp0ta up")) ok++;
     else { bad++; printf("bad st yp0ta %s\n", c); }
-    if (aprs_packet(&p, "YP0TA", 0, "APZFLP", 0, c)) ok++;
+    if (aprs_packet(&p, "YP0TA", 0, "APZFLP", 0, c, NULL)) ok++;
     else { bad++; printf("bad packet yp0ta\n"); }
     if (p.ax25_len == sizeof(ax_yp0ta)) ok++;
     else { bad++; printf("bad len yp0ta %u\n", (unsigned)p.ax25_len); }
@@ -172,7 +172,7 @@ int main(void)
     if (aprs_message(msg, sizeof(msg), "YO8YL", 5, "73") == (int)strlen(":YO8YL-5  :73") &&
         !strcmp(msg, ":YO8YL-5  :73")) ok++;
     else { bad++; printf("bad msg yo3gnd yo8yl %s\n", msg); }
-    if (aprs_packet(&p, "YO3GND", 1, "APZFLP", 0, msg)) ok++;
+    if (aprs_packet(&p, "YO3GND", 1, "APZFLP", 0, msg, NULL)) ok++;
     else { bad++; printf("bad packet yo3gnd\n"); }
     if (p.ax25_len == sizeof(ax_yo3gnd)) ok++;
     else { bad++; printf("bad len yo3gnd %u\n", (unsigned)p.ax25_len); }
@@ -189,7 +189,7 @@ int main(void)
     if (aprs_message(msg, sizeof(msg), "YO9LIG", 2, "jy1 hi") == (int)strlen(":YO9LIG-2 :jy1 hi") &&
         !strcmp(msg, ":YO9LIG-2 :jy1 hi")) ok++;
     else { bad++; printf("bad msg jy1 yo9lig %s\n", msg); }
-    if (aprs_packet(&p, "JY1", 0, "APZFLP", 0, msg)) ok++;
+    if (aprs_packet(&p, "JY1", 0, "APZFLP", 0, msg, NULL)) ok++;
     else { bad++; printf("bad packet jy1\n"); }
     if (p.ax25_len == sizeof(ax_jy1)) ok++;
     else { bad++; printf("bad len jy1 %u\n", (unsigned)p.ax25_len); }
@@ -206,7 +206,7 @@ int main(void)
     if (aprs_message(msg, sizeof(msg), "YO3GND", 1, "lig hi") == (int)strlen(":YO3GND-1 :lig hi") &&
         !strcmp(msg, ":YO3GND-1 :lig hi")) ok++;
     else { bad++; printf("bad msg yo9lig yo3gnd %s\n", msg); }
-    if (aprs_packet(&p, "YO9LIG", 0, "APZFLP", 0, msg)) ok++;
+    if (aprs_packet(&p, "YO9LIG", 0, "APZFLP", 0, msg, NULL)) ok++;
     else { bad++; printf("bad packet yo9lig\n"); }
     if (p.ax25_len == sizeof(ax_yo9lig)) ok++;
     else { bad++; printf("bad len yo9lig %u\n", (unsigned)p.ax25_len); }
@@ -224,7 +224,7 @@ int main(void)
             (int)strlen("!4426.25N/02605.41E-Cismigiu Park") &&
         !strcmp(msg, "!4426.25N/02605.41E-Cismigiu Park")) ok++;
     else { bad++; printf("bad pos yo8yl %s\n", msg); }
-    if (aprs_packet(&p, "YO8YL", 12, "APZFLP", 0, msg)) ok++;
+    if (aprs_packet(&p, "YO8YL", 12, "APZFLP", 0, msg, NULL)) ok++;
     else { bad++; printf("bad packet yo8yl pos\n"); }
     if (p.ax25_len == sizeof(ax_yo8yl_pos)) ok++;
     else { bad++; printf("bad len yo8yl pos %u\n", (unsigned)p.ax25_len); }
@@ -259,7 +259,7 @@ int main(void)
         if (n > 0) ok++;
         else { bad++; printf("bad loop msg %d\n", i); continue; }
 
-        if (aprs_packet(&p, src, sa, "APZFLP", 0, msg)) ok++;
+        if (aprs_packet(&p, src, sa, "APZFLP", 0, msg, NULL)) ok++;
         else { bad++; printf("bad loop packet %d\n", i); continue; }
 
         if (p.payload_len == (uint16_t)n && !memcmp(p.payload, msg, p.payload_len)) ok++;

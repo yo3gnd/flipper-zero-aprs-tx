@@ -216,12 +216,14 @@ int aprs_message(char *out, uint16_t n, const char *dst, uint8_t ssid, const cha
 }
 
 bool aprs_packet(Packet *p, const char *from, uint8_t from_ssid, const char *to, uint8_t to_ssid,
-                 const char *payload)
+                 const char *payload, const char *path)
 {
     uint16_t i;
 
     if (!p || !from || !to || !payload)
         return false;
+
+    (void)path;
 
     packet_init(p);
     snprintf((char *)p->payload, sizeof(p->payload), "%s", payload);
@@ -259,9 +261,11 @@ void packet_make_payload(Packet *p, const char *s)
 }
 
 void packet_make_ax25(Packet *p, const char *from, uint8_t from_ssid, const char *to,
-                      uint8_t to_ssid)
+                      uint8_t to_ssid, const char *path)
 {
     uint16_t i;
+
+    (void)path;
 
     aprs_addr(p->ax25 + 0, to, to_ssid, 0);
     aprs_addr(p->ax25 + 7, from, from_ssid, 1);
@@ -274,10 +278,10 @@ void packet_make_ax25(Packet *p, const char *from, uint8_t from_ssid, const char
 }
 
 void packet_do_all(Packet *p, const char *from, uint8_t from_ssid, const char *to, uint8_t to_ssid,
-                   const char *s)
+                   const char *s, const char *path)
 {
     packet_make_payload(p, s);
-    packet_make_ax25(p, from, from_ssid, to, to_ssid);
+    packet_make_ax25(p, from, from_ssid, to, to_ssid, path);
     packet_add_fcs(p);
     packet_stuff(p);
     packet_nrzi(p);

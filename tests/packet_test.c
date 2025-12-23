@@ -23,7 +23,7 @@ typedef struct {
 
 void packet_init(Packet* p);
 void packet_make_payload(Packet* p, const char* s);
-void packet_make_ax25(Packet* p, const char* from, uint8_t from_ssid, const char* to, uint8_t to_ssid);
+void packet_make_ax25(Packet* p, const char* from, uint8_t from_ssid, const char* to, uint8_t to_ssid, const char* path);
 void packet_add_fcs(Packet* p);
 void packet_stuff(Packet* p);
 
@@ -33,7 +33,7 @@ void packet_nrzi(Packet* p);
 
 
 /* ---------------------- */
-void packet_do_all(Packet* p, const char* from, uint8_t from_ssid, const char* to, uint8_t to_ssid, const char* s);
+void packet_do_all(Packet* p, const char* from, uint8_t from_ssid, const char* to, uint8_t to_ssid, const char* s, const char* path);
 
 typedef struct 
 {
@@ -155,7 +155,7 @@ static void packet_test_ax25_mockup(void)
 
     packet_init(&p);
     packet_make_payload(&p, "TEST123");
-    packet_make_ax25(&p, "YO0FLP", 0, "W0RLD", 0);
+    packet_make_ax25(&p, "YO0FLP", 0, "W0RLD", 0, NULL);
 
     packet_test_u16("ax25 len", p.ax25_len, sizeof(want));
     packet_test_bytes("ax25 bytes", p.ax25, p.ax25_len, want, sizeof(want));
@@ -172,7 +172,7 @@ static void packet_test_ax25_ssid_mockup(void)
 
     packet_init(&p);
     packet_make_payload(&p, "");
-    packet_make_ax25(&p, "N0CALL", 3, "AP", 15);
+    packet_make_ax25(&p, "N0CALL", 3, "AP", 15, NULL);
 
     packet_test_u16("ax25 ssid len", p.ax25_len, sizeof(a));
     packet_test_bytes("ax25 ssid bytes", p.ax25, p.ax25_len, a, sizeof(a));
@@ -190,7 +190,7 @@ static void packet_test_fcs_mockup(void)
 
     packet_init(&p);
     packet_make_payload(&p, "TEST123");
-    packet_make_ax25(&p, "YO0FLP", 0, "W0RLD", 0);
+    packet_make_ax25(&p, "YO0FLP", 0, "W0RLD", 0, NULL);
     packet_add_fcs(&p);
 
     packet_test_u16("fcs lungime", p.fcs_len, sizeof(want));
@@ -208,7 +208,7 @@ static void packet_test_stuff_mockup(void)
 
     packet_init(&p);
     packet_make_payload(&p, "TEST123");
-    packet_make_ax25(&p, "YO0FLP", 0, "W0RLD", 0);
+    packet_make_ax25(&p, "YO0FLP", 0, "W0RLD", 0, NULL);
     packet_add_fcs(&p);
     packet_stuff(&p);
 
@@ -241,7 +241,7 @@ static void packet_test_nrzi_mockup(void)
 
     packet_init(&p);
     packet_make_payload(&p, "TEST123");
-    packet_make_ax25(&p, "YO0FLP", 0, "W0RLD", 0);
+    packet_make_ax25(&p, "YO0FLP", 0, "W0RLD", 0, NULL);
     packet_add_fcs(&p);
     packet_stuff(&p);
     packet_nrzi(&p);
@@ -296,7 +296,7 @@ static void testmare(void)
     Packet p;
 
 
-    packet_do_all(&p, "YO0FLP", 0, "W0RLD", 0, "Hello world, I am Flipper Zero :D");
+    packet_do_all(&p, "YO0FLP", 0, "W0RLD", 0, "Hello world, I am Flipper Zero :D", NULL);
 
     packet_test_u16("all payload len", p.payload_len, sizeof(a) - 1);
     packet_test_bytes("all payload bytes", p.payload, p.payload_len, a, sizeof(a) - 1);

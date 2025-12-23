@@ -15,11 +15,11 @@ int aprs_message(char *out, uint16_t n, const char *dst, uint8_t ssid, const cha
 int aprs_pos(char *out, uint16_t n, const char *name, const char *lat, const char *lon);
 
 bool aprs_packet(Packet *p, const char *from, uint8_t from_ssid, const char *to, uint8_t to_ssid,
-                 const char *payload);
+                 const char *payload, const char *path);
 bool call_crc(const char *s, uint16_t ptr);
 
 void packet_make_payload(Packet *p, const char *s);
 void packet_make_ax25(Packet *p, const char *from, uint8_t from_ssid, const char *to,
-                      uint8_t to_ssid);
+                      uint8_t to_ssid, const char *path);
 void packet_do_all(Packet *p, const char *from, uint8_t from_ssid, const char *to, uint8_t to_ssid,
-                   const char *s);
+                   const char *s, const char *path);

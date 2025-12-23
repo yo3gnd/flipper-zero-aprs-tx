@@ -11,6 +11,8 @@
 
 bool call_split(const char *s, char *out, uint8_t *ssid, bool *has_ssid);
 
+#define APRS_DEFAULT_PATH NULL
+
 #define FLIPPERHAM_ASYNC_PRESET(NAME, MOD, DRATE3, DRATE4, DEV)                                    \
     static const uint8_t NAME[] = {                                                                \
         CC1101_IOCFG0,                                                                             \
@@ -357,7 +359,7 @@ void txstart(FlipperHamApp *app)
                     src_ssid = app->ham_ssid[app->ham_index];
             }
 
-    if (!aprs_packet(app->pkt, src, src_ssid, MY_TOCALL, 0, message))
+    if (!aprs_packet(app->pkt, src, src_ssid, MY_TOCALL, 0, message, APRS_DEFAULT_PATH))
         return;
 
     if (app->leadin_ms)
