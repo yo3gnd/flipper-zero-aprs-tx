@@ -100,6 +100,14 @@ enum
 enum
 {
     FlipperHamSettingsIndexFreq = 0,
+    FlipperHamSettingsIndexBaud,
+    FlipperHamSettingsIndexAprsPath,
+    FlipperHamSettingsIndexProfile,
+    FlipperHamSettingsIndexDeviation,
+    FlipperHamSettingsIndexRepeat,
+    FlipperHamSettingsIndexLeadin,
+    FlipperHamSettingsIndexPreamble,
+    FlipperHamSettingsIndexCustomPath,
 };
 
 enum
