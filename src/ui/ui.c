@@ -622,7 +622,7 @@ void ham_menu_build(FlipperHamApp *app)
         snprintf(a, sizeof(a), "%s", app->ham_calls[app->ham_index]);
     variable_item_set_current_value_text(it, a);
 
-    variable_item_list_add(app->ham_menu, "73 de YO3GND", 1, NULL, NULL);
+    variable_item_list_add(app->ham_menu, "73!", 1, NULL, NULL);
     variable_item_list_set_selected_item(app->ham_menu, app->ham_sel);
 }
 
