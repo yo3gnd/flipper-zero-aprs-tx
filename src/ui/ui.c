@@ -1,5 +1,6 @@
 #include "ui_i.h"
 #include "ui_splash.h"
+#include "../cw.h"
 
 #include <furi_hal.h>
 #include <gui/view.h>
@@ -99,9 +100,9 @@ static void ham_morse_play(FlipperHamApp *app)
     static const char *a = "73 DE YO3GND";
     ViewPort *v;
     NotificationApp *n;
-    const char *p;
     uint32_t d;
-    uint8_t i, j;
+    uint8_t i;
+    uint8_t cw_char;
 
     v = view_port_alloc();
     view_port_draw_callback_set(v, ham_blank_draw, app);
@@ -123,51 +124,22 @@ static void ham_morse_play(FlipperHamApp *app)
 
     for (i = 0; a[i]; i++)
     {
-        p = NULL;
-        switch (a[i])
-        {
-        case '7':
-            p = "--...";
-            break;
-        case '3':
-            p = "...--";
-            break;
-        case 'D':
-            p = "-..";
-            break;
-        case 'E':
-            p = ".";
-            break;
-        case 'Y':
-            p = "-.--";
-            break;
-        case 'O':
-            p = "---";
-            break;
-        case 'G':
-            p = "--.";
-            break;
-        case 'N':
-            p = "-.";
-            break;
-        case ' ':
-            break;
-        default:
-            break;
-        }
-
-        if (!p)
+        if (a[i] == ' ')
             continue;
 
-        for (j = 0; p[j]; j++)
+        cw_char = cw(a[i]);
+        if (cw_char == CW_INVALID)
+            continue;
+
+        FOR_EACH_CW_SYMBOL(sym)
         {
-            d = (p[j] == '-') ? 180 : 60;
+            d = sym ? 180 : 60;
             notification_message(n, &sequence_display_backlight_on);
             furi_hal_speaker_start(880.0f, 0.7f);
             furi_delay_ms(d);
             furi_hal_speaker_stop();
             notification_message(n, &sequence_display_backlight_off);
-            if (p[j + 1])
+            if (cw_char > 3)
                 furi_delay_ms(60);
         }
 

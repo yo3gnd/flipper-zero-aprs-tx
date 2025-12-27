@@ -9,6 +9,7 @@ App(
         "src/flipperham.c",
         "src/positions.c",
         "src/callbook.c",
+        "src/cw.c",
         "src/ham_calls.c",
         "src/packet.c",
         "src/aprs.c",
