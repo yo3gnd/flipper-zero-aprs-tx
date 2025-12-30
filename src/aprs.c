@@ -95,6 +95,29 @@ static void aprs_addr(uint8_t *out, const char *call, uint8_t ssid, uint8_t last
     out[6] = 0x60 | ((ssid & 15) << 1) | (last ? 1 : 0);
 }
 
+static bool aprs_call_ok(const char *s)
+{
+    uint8_t i;
+    char c;
+
+    if (!s || !s[0])
+        return false;
+
+    i = 0;
+    while (s[i])
+    {
+        c = s[i];
+        if (!((c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')))
+            return false;
+        i++;
+        if (i > 6)
+            return false;
+    }
+
+
+    return true;
+}
+
 int aprs_ll_clamp(char *out, uint16_t n, const char *s, uint8_t lon)
 {
     float value;
@@ -186,6 +209,10 @@ int aprs_message(char *out, uint16_t n, const char *dst, uint8_t ssid, const cha
 
     if (!out || !n || !dst)
         return 0;
+    if (!aprs_call_ok(dst))
+        return 0;
+    if (ssid > 15)
+        return 0;
 
     dst_len = sizeof(dst_full);
     i = 0;
@@ -221,6 +248,10 @@ bool aprs_packet(Packet *p, const char *from, uint8_t from_ssid, const char *to,
     uint16_t i;
 
     if (!p || !from || !to || !payload)
+        return false;
+    if (!aprs_call_ok(from) || !aprs_call_ok(to))
+        return false;
+    if (from_ssid > 15 || to_ssid > 15)
         return false;
 
     (void)path;
