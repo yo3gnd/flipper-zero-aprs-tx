@@ -15,10 +15,10 @@ This app can send:
 
 It lets you manage each packet type, keep a small destination callbook, and tune a few radio-side parameters to improve decoding. However, at its core, this is a deliberately rough FSK hack pretending to be FM, and it relies heavily on the receiver's discriminator and filters.
 
-![Settings](Screenshot-20231015-082113.png) ![More settings](Screenshot-20231015-082119.png)
+![Settings](docs/pics/Screenshot-20231015-082113.png) ![More settings](docs/pics/Screenshot-20231015-082119.png)
 
 
-![Callbook](Screenshot-20231015-082145.png) ![TX Screen](Screenshot-20231015-082151.png)
+![Callbook](docs/pics/Screenshot-20231015-082145.png) ![TX Screen](docs/pics/Screenshot-20231015-082151.png)
 
 ## Usage
 

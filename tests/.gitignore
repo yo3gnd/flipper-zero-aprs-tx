@@ -1,5 +1,3 @@
-packet_test
-aprs_test
 build/
 libaprs.so
 *.o
