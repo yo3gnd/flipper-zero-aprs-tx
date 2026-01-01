@@ -7,6 +7,7 @@
 #define TXT_N 16
 #define POS_LEN 16
 #define CALL_LEN 10
+#define APRS_PATH_LEN 9
 #define CALL_N 32
 #define FREQ_N 4
 #define HAM_N 8
@@ -55,6 +56,8 @@ typedef struct
     uint8_t calls_n;
     uint8_t pos_n;
     uint8_t freq_n;
+    uint8_t aprs_path_index;
+    char aprs_path_edit[APRS_PATH_LEN];
 } FlipperHamCfg;
 
 enum

@@ -6,6 +6,7 @@
 #include <furi_hal_subghz.h>
 #include <storage/storage.h>
 
+#include <stddef.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -43,6 +44,8 @@ static void cfg_defaults(FlipperHamApp *app)
     app->repeat_n = 1;
     app->leadin_ms = 50;
     app->preamble_ms = 350;
+    app->aprs_path_index = 0;
+    app->aprs_path_edit[0] = 0;
 
     /* Seed one valid entry of each type so a fresh install is immediately testable. */
     snprintf(app->bulletin[0], sizeof(app->bulletin[0]), "flipper bulletin");
@@ -98,10 +101,12 @@ void cfgsave(FlipperHamApp *app)
     c->ham_index = app->ham_index;
     c->leadin_ms = app->leadin_ms;
     c->preamble_ms = app->preamble_ms;
+    c->aprs_path_index = app->aprs_path_index;
 
     memcpy(c->bulletin, app->bulletin, sizeof(c->bulletin));
     memcpy(c->status, app->status, sizeof(c->status));
     memcpy(c->freq, app->freq, sizeof(c->freq));
+    memcpy(c->aprs_path_edit, app->aprs_path_edit, sizeof(c->aprs_path_edit));
 
     memcpy(c->message, app->message, sizeof(c->message));
     memcpy(c->pos_name, app->pos_name, sizeof(c->pos_name));
@@ -143,6 +148,7 @@ void cfgload(FlipperHamApp *app)
     File *file;
     FlipperHamCfg *c;
     uint16_t n;
+    uint16_t old_n;
     uint8_t i;
 
     c = malloc(sizeof(FlipperHamCfg));
@@ -151,6 +157,8 @@ void cfgload(FlipperHamApp *app)
         cfg_defaults(app);
         return;
     }
+
+    memset(c, 0, sizeof(FlipperHamCfg));
 
     storage = furi_record_open(RECORD_STORAGE);
     file = storage_file_alloc(storage);
@@ -175,7 +183,8 @@ void cfgload(FlipperHamApp *app)
     storage_file_free(file);
     furi_record_close(RECORD_STORAGE);
 
-    if (n != sizeof(FlipperHamCfg))
+    old_n = offsetof(FlipperHamCfg, aprs_path_index);
+    if (n != sizeof(FlipperHamCfg) && n != old_n)
     {
         free(c);
         cfg_defaults(app);
@@ -194,10 +203,12 @@ void cfgload(FlipperHamApp *app)
     app->ham_index = c->ham_index;
     app->leadin_ms = c->leadin_ms;
     app->preamble_ms = c->preamble_ms;
+    app->aprs_path_index = c->aprs_path_index;
 
     memcpy(app->bulletin, c->bulletin, sizeof(app->bulletin));
     memcpy(app->status, c->status, sizeof(app->status));
     memcpy(app->freq, c->freq, sizeof(app->freq));
+    memcpy(app->aprs_path_edit, c->aprs_path_edit, sizeof(app->aprs_path_edit));
     memcpy(app->message, c->message, sizeof(app->message));
     memcpy(app->pos_name, c->pos_name, sizeof(app->pos_name));
     memcpy(app->pos_lat, c->pos_lat, sizeof(app->pos_lat));
@@ -222,6 +233,8 @@ void cfgload(FlipperHamApp *app)
 
     if (app->dst_ssid > 15)
         app->dst_ssid = 0;
+    if (app->aprs_path_index > 7)
+        app->aprs_path_index = 0;
     if (!app->repeat_n || app->repeat_n > 5)
         app->repeat_n = 1;
     if (app->leadin_ms > 1000)
@@ -242,6 +255,7 @@ void cfgload(FlipperHamApp *app)
         app->pos_lat[i][POS_LEN - 1] = 0;
         app->pos_lon[i][POS_LEN - 1] = 0;
     }
+    app->aprs_path_edit[APRS_PATH_LEN - 1] = 0;
 
     bulletin_fix(app);
     status_fix(app);

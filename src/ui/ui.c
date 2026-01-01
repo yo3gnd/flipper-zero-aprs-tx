@@ -17,8 +17,23 @@ static void ham_morse_play(FlipperHamApp *app);
 static void c2(void *context, uint32_t index);
 static void aprs_path_change(VariableItem *item);
 static void aprs_path_custom_save(void *context);
+static const char *aprs_paths[] = {"None", "RFONLY", "NOGATE", "W1-1", "W2-2", "ARISS", "APRSAT", "Custom"};
 FlipperHamApp *gapp;
 static bool call_copy(FlipperHamApp *app);
+
+static void aprs_path_up(char *s)
+{
+    uint8_t i;
+
+    if (!s)
+        return;
+
+    for (i = 0; s[i]; i++)
+        if (s[i] >= 'a' && s[i] <= 'z')
+            s[i] = (char)(s[i] - 'a' + 'A');
+
+
+}
 
 void flipperham_draw_callback(Canvas *canvas, void *context)
 {
@@ -620,12 +635,12 @@ void ham_tx_menu_build(FlipperHamApp *app)
 
 void settings_menu_build(FlipperHamApp *app)
 {
-    static const char *paths[] = {"None", "RFONLY", "NOGATE", "WIDE1-1", "WIDE2-2", "ARISS", "APRSAT", "Custom"};
     VariableItem *it;
     char a[16];
 
     variable_item_list_reset(app->settings_menu);
-    app->aprs_path_index = 4;
+    if (app->aprs_path_index >= sizeof(aprs_paths) / sizeof(aprs_paths[0]))
+        app->aprs_path_index = 0;
 
     it = variable_item_list_add(app->settings_menu, "Frequency", 1, NULL, NULL);
     freq_show(a, sizeof(a), tx_freq_get(app));
@@ -638,9 +653,10 @@ void settings_menu_build(FlipperHamApp *app)
     variable_item_set_current_value_index(it, app->encoding_index);
     variable_item_set_current_value_text(it, flipperham_modem_profiles[app->encoding_index].name);
 
-    it = variable_item_list_add(app->settings_menu, "APRS Path", sizeof(paths) / sizeof(paths[0]), aprs_path_change, app);
+    it = variable_item_list_add(
+        app->settings_menu, "APRS Path", sizeof(aprs_paths) / sizeof(aprs_paths[0]), aprs_path_change, app);
     variable_item_set_current_value_index(it, app->aprs_path_index);
-    variable_item_set_current_value_text(it, paths[app->aprs_path_index]);
+    variable_item_set_current_value_text(it, aprs_paths[app->aprs_path_index]);
 
     it = variable_item_list_add(app->settings_menu, "CC1101 profile", 2, profile_change, app);
     variable_item_set_current_value_index(it, app->rf_mod);
@@ -834,14 +850,14 @@ void baud_change(VariableItem *item)
 
 static void aprs_path_change(VariableItem *item)
 {
-    static const char *paths[] = {"None", "RFONLY", "NOGATE", "WIDE1-1", "WIDE2-2", "ARISS", "APRSAT", "Custom"};
     FlipperHamApp *app = variable_item_get_context(item);
 
     app->aprs_path_index = variable_item_get_current_value_index(item);
-    if (app->aprs_path_index >= sizeof(paths) / sizeof(paths[0]))
-        app->aprs_path_index = 4;
+    if (app->aprs_path_index >= sizeof(aprs_paths) / sizeof(aprs_paths[0]))
+        app->aprs_path_index = 0;
 
-    variable_item_set_current_value_text(item, paths[app->aprs_path_index]);
+    variable_item_set_current_value_text(item, aprs_paths[app->aprs_path_index]);
+    cfgsave(app);
 }
 
 void profile_change(VariableItem *item)
@@ -963,7 +979,7 @@ void settings_enter(void *context, uint32_t index)
         text_input_reset(app->text_input);
         text_input_set_header_text(app->text_input, "Custom Path");
         text_input_set_result_callback(app->text_input, aprs_path_custom_save, app, app->aprs_path_edit,
-                                       sizeof(app->aprs_path_edit), false);
+                                       APRS_PATH_LEN, false);
         view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewTextInput);
     }
 }
@@ -972,6 +988,8 @@ static void aprs_path_custom_save(void *context)
 {
     FlipperHamApp *app = context;
 
+    aprs_path_up(app->aprs_path_edit);
+    cfgsave(app);
     settings_menu_build(app);
     variable_item_list_set_selected_item(app->settings_menu, FlipperHamSettingsIndexCustomPath);
 
