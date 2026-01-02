@@ -118,6 +118,88 @@ static bool aprs_call_ok(const char *s)
     return true;
 }
 
+static uint8_t aprs_path_n(const char *path)
+{
+    uint8_t n;
+    bool in;
+
+    if (!path || !path[0])
+        return 0;
+
+    n = 0;
+    in = false;
+    while (*path)
+    {
+        if (*path == ',')
+            in = false;
+        else if (!in)
+        {
+            n++;
+            in = true;
+        }
+
+        path++;
+    }
+
+
+    return n;
+}
+
+static bool aprs_path_addr(uint8_t *out, const char *path, uint16_t *used, uint8_t last)
+{
+    char a[7];
+    uint8_t i;
+    uint8_t ssid;
+    char c;
+
+    if (!path || !used)
+        return false;
+
+    i = 0;
+    ssid = 0;
+    while (path[*used] && path[*used] != ',')
+    {
+        c = path[*used];
+        if (c == '-')
+        {
+            (*used)++;
+            if (path[*used] < '0' || path[*used] > '9')
+                return false;
+
+            while (path[*used] && path[*used] != ',')
+            {
+                c = path[*used];
+                if (c < '0' || c > '9')
+                    return false;
+                ssid = (uint8_t)(ssid * 10 + (c - '0'));
+                if (ssid > 15)
+                    return false;
+                (*used)++;
+            }
+            break;
+        }
+
+        if (!((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')))
+            return false;
+        if (i >= 6)
+            return false;
+
+        a[i++] = c;
+        (*used)++;
+    }
+
+    if (!i)
+        return false;
+    a[i] = 0;
+    aprs_addr(out, a, ssid, last);
+
+    if (path[*used] == ',')
+        (*used)++;
+
+
+    return true;
+}
+
 int aprs_ll_clamp(char *out, uint16_t n, const char *s, uint8_t lon)
 {
     float value;
@@ -245,8 +327,6 @@ int aprs_message(char *out, uint16_t n, const char *dst, uint8_t ssid, const cha
 bool aprs_packet(Packet *p, const char *from, uint8_t from_ssid, const char *to, uint8_t to_ssid,
                  const char *payload, const char *path)
 {
-    uint16_t i;
-
     if (!p || !from || !to || !payload)
         return false;
     if (!aprs_call_ok(from) || !aprs_call_ok(to))
@@ -254,20 +334,13 @@ bool aprs_packet(Packet *p, const char *from, uint8_t from_ssid, const char *to,
     if (from_ssid > 15 || to_ssid > 15)
         return false;
 
-    (void)path;
-
     packet_init(p);
     snprintf((char *)p->payload, sizeof(p->payload), "%s", payload);
     p->payload_len = strlen((char *)p->payload);
 
-    aprs_addr(p->ax25 + 0, to, to_ssid, 0);
-    aprs_addr(p->ax25 + 7, from, from_ssid, 1);
-    p->ax25[14] = 0x03;
-    p->ax25[15] = 0xF0;
-    p->ax25_len = 16;
-
-    for (i = 0; i < p->payload_len && p->ax25_len < sizeof(p->ax25); i++)
-        p->ax25[p->ax25_len++] = p->payload[i];
+    packet_make_ax25(p, from, from_ssid, to, to_ssid, path);
+    if (!p->ax25_len)
+        return false;
 
     packet_add_fcs(p);
     packet_stuff(p);
@@ -295,14 +368,35 @@ void packet_make_ax25(Packet *p, const char *from, uint8_t from_ssid, const char
                       uint8_t to_ssid, const char *path)
 {
     uint16_t i;
-
-    (void)path;
+    uint16_t used;
+    uint8_t n;
+    uint8_t k;
 
     aprs_addr(p->ax25 + 0, to, to_ssid, 0);
-    aprs_addr(p->ax25 + 7, from, from_ssid, 1);
-    p->ax25[14] = 0x03;
-    p->ax25[15] = 0xF0;
-    p->ax25_len = 16;
+    n = aprs_path_n(path);
+    aprs_addr(p->ax25 + 7, from, from_ssid, n ? 0 : 1);
+    p->ax25_len = 14;
+
+    used = 0;
+    for (k = 0; k < n; k++)
+    {
+        if ((uint32_t)p->ax25_len + 7u > sizeof(p->ax25))
+        {
+            p->ax25_len = 0;
+            return;
+        }
+
+        if (!aprs_path_addr(p->ax25 + p->ax25_len, path, &used, k + 1 >= n))
+        {
+            p->ax25_len = 0;
+            return;
+        }
+
+        p->ax25_len += 7;
+    }
+
+    p->ax25[p->ax25_len++] = 0x03;
+    p->ax25[p->ax25_len++] = 0xF0;
 
     for (i = 0; i < p->payload_len && p->ax25_len < sizeof(p->ax25); i++)
         p->ax25[p->ax25_len++] = p->payload[i];
@@ -313,6 +407,8 @@ void packet_do_all(Packet *p, const char *from, uint8_t from_ssid, const char *t
 {
     packet_make_payload(p, s);
     packet_make_ax25(p, from, from_ssid, to, to_ssid, path);
+    if (!p->ax25_len)
+        return;
     packet_add_fcs(p);
     packet_stuff(p);
     packet_nrzi(p);

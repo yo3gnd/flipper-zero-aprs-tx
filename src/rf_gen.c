@@ -11,8 +11,6 @@
 
 bool call_split(const char *s, char *out, uint8_t *ssid, bool *has_ssid);
 
-#define APRS_DEFAULT_PATH NULL
-
 #define FLIPPERHAM_ASYNC_PRESET(NAME, MOD, DRATE3, DRATE4, DEV)                                    \
     static const uint8_t NAME[] = {                                                                \
         CC1101_IOCFG0,                                                                             \
@@ -70,6 +68,7 @@ static bool wave_put(FlipperHamApp *app, uint8_t bit);
 static bool wave_add(FlipperHamApp *app, double value);
 static LevelDuration edge_yield(void *context);
 static uint16_t round_u16_even(double value);
+static const char *aprs_path_pick(FlipperHamApp *app);
 
 FLIPPERHAM_ASYNC_PRESET(flipperham_preset_2fsk_d00_async_regs, 0x04, 0x83, 0x67, 0x00)
 FLIPPERHAM_ASYNC_PRESET(flipperham_preset_2fsk_d01_async_regs, 0x04, 0x83, 0x67, 0x01)
@@ -116,6 +115,21 @@ const FlipperHamPreset flipperham_presets[] = {
     {"2FSK 5.0", flipperham_preset_2fsk_d15_async_regs},
     {"GFSK 5.0", flipperham_preset_gfsk_d15_async_regs},
 };
+
+static const char *aprs_path_pick(FlipperHamApp *app)
+{
+    static const char *paths[] = {"None", "RFONLY", "NOGATE", "W1-1", "W2-2", "ARISS", "APRSAT", "Custom"};
+
+    if (!app)
+        return NULL;
+    if (app->aprs_path_index >= sizeof(paths) / sizeof(paths[0]))
+        return NULL;
+    if (app->aprs_path_index == 0)
+        return NULL;
+
+
+    return paths[app->aprs_path_index];
+}
 
 void preset_fix(FlipperHamApp *app)
 {
@@ -261,6 +275,7 @@ void txstart(FlipperHamApp *app)
     char message[96];
     char dst[CALL_LEN];
     const FlipperHamModemProfile *p;
+    const char *path;
     const char *src;
     uint16_t i;
     uint16_t n;
@@ -349,6 +364,7 @@ void txstart(FlipperHamApp *app)
 
     src = MY_CALL;
     src_ssid = 0;
+    path = aprs_path_pick(app);
     if (app->ham_ok)
         if (app->ham_n)
             if (app->ham_index < app->ham_n)
@@ -359,7 +375,7 @@ void txstart(FlipperHamApp *app)
                     src_ssid = app->ham_ssid[app->ham_index];
             }
 
-    if (!aprs_packet(app->pkt, src, src_ssid, MY_TOCALL, 0, message, APRS_DEFAULT_PATH))
+    if (!aprs_packet(app->pkt, src, src_ssid, MY_TOCALL, 0, message, path))
         return;
 
     if (app->leadin_ms)
