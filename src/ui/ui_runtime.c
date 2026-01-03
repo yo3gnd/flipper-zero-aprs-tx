@@ -274,6 +274,7 @@ FlipperHamApp *flipperham_app_alloc(void)
     app->f_bad = false;
     app->aprs_path_index = 0;
     app->aprs_path_edit[0] = 0;
+    app->debug_tx = false;
     app->return_view = FlipperHamViewMenu;
     app->splash_mode = 0;
     app->splash_next_view = FlipperHamViewMenu;

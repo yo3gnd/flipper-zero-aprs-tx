@@ -46,6 +46,7 @@ static void cfg_defaults(FlipperHamApp *app)
     app->preamble_ms = 350;
     app->aprs_path_index = 0;
     app->aprs_path_edit[0] = 0;
+    app->debug_tx = false;
 
     /* Seed one valid entry of each type so a fresh install is immediately testable. */
     snprintf(app->bulletin[0], sizeof(app->bulletin[0]), "flipper bulletin");
@@ -102,6 +103,7 @@ void cfgsave(FlipperHamApp *app)
     c->leadin_ms = app->leadin_ms;
     c->preamble_ms = app->preamble_ms;
     c->aprs_path_index = app->aprs_path_index;
+    c->debug_tx = app->debug_tx;
 
     memcpy(c->bulletin, app->bulletin, sizeof(c->bulletin));
     memcpy(c->status, app->status, sizeof(c->status));
@@ -149,6 +151,7 @@ void cfgload(FlipperHamApp *app)
     FlipperHamCfg *c;
     uint16_t n;
     uint16_t old_n;
+    uint16_t old_n2;
     uint8_t i;
 
     c = malloc(sizeof(FlipperHamCfg));
@@ -184,7 +187,8 @@ void cfgload(FlipperHamApp *app)
     furi_record_close(RECORD_STORAGE);
 
     old_n = offsetof(FlipperHamCfg, aprs_path_index);
-    if (n != sizeof(FlipperHamCfg) && n != old_n)
+    old_n2 = offsetof(FlipperHamCfg, debug_tx);
+    if (n != sizeof(FlipperHamCfg) && n != old_n && n != old_n2)
     {
         free(c);
         cfg_defaults(app);
@@ -204,6 +208,7 @@ void cfgload(FlipperHamApp *app)
     app->leadin_ms = c->leadin_ms;
     app->preamble_ms = c->preamble_ms;
     app->aprs_path_index = c->aprs_path_index;
+    app->debug_tx = c->debug_tx ? true : false;
 
     memcpy(app->bulletin, c->bulletin, sizeof(app->bulletin));
     memcpy(app->status, c->status, sizeof(app->status));

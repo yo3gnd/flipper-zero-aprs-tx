@@ -137,6 +137,7 @@ typedef struct FlipperHamApp
     char f_edit[16];
     char aprs_path_edit[APRS_PATH_LEN];
     char c2_h[24];
+    bool debug_tx;
     char freq_s[FREQ_N][16];
     uint8_t aprs_path_index;
     uint32_t freq_edit_hz;

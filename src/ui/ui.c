@@ -16,6 +16,7 @@ static void ham_blank_input(InputEvent *event, void *context);
 static void ham_morse_play(FlipperHamApp *app);
 static void c2(void *context, uint32_t index);
 static void aprs_path_change(VariableItem *item);
+static void dbg_change(VariableItem *item);
 static void aprs_path_custom_save(void *context);
 static const char *aprs_paths[] = {"None", "RFONLY", "NOGATE", "W1-1", "W2-2", "ARISS", "APRSAT", "Custom"};
 FlipperHamApp *gapp;
@@ -35,11 +36,98 @@ static void aprs_path_up(char *s)
 
 }
 
+static bool txdbgtype(char c)
+{
+    switch (c)
+    {
+    case ':':
+    case '>':
+    case '!':
+    case '=':
+    case '?':
+    case ';':
+    case '@':
+    case '\'':
+    case '`':
+        return true;
+    default:
+        return false;
+    }
+}
+
+static void txdbgp(Canvas *canvas, const char *s)
+{
+    char a[24];
+    uint8_t y, n, k;
+
+    if (!s) return;
+    if (!s[0]) return;
+
+    y = 31;
+    if (txdbgtype(s[0]))
+    {
+        a[0] = s[0];
+        a[1] = 0;
+        canvas_draw_str(canvas, 0, y, a);
+        s++;
+        y += 8;
+    }
+
+    while (*s && y <= 63)
+    {
+        n = 0;
+        while (s[n] && n < 21)
+            n++;
+        for (k = 0; k < n; k++) a[k] = s[k];
+        a[n] = 0;
+        canvas_draw_str(canvas, 0, y, a);
+        s += n;
+        y += 8;
+    }
+
+
+}
+
+static void txdbg(Canvas *canvas, FlipperHamApp *app)
+{
+    char a[24];
+    uint32_t hz, khz, rem;
+    const char *st = app->repeat_wait ? "Wait" : "TX";
+    uint8_t x;
+
+    hz = tx_freq_get(app);
+    khz = hz / 1000UL;
+    rem = hz % 1000UL;
+
+    canvas_clear(canvas);
+    canvas_set_font(canvas, FontKeyboard);
+
+    snprintf(a, sizeof(a), "khz: %06lu.%03lu", (unsigned long)khz, (unsigned long)rem);
+    canvas_draw_str(canvas, 0, 7, a);
+
+    snprintf(a, sizeof(a), "repeat %u/%u", app->repeat_i, app->repeat_n);
+    canvas_draw_str(canvas, 0, 15, a);
+
+    x = (uint8_t)(128 - (strlen(st) * 6));
+    canvas_draw_str(canvas, x, 15, st);
+
+    if (app->pkt)
+        txdbgp(canvas, (const char *)app->pkt->payload);
+
+
+}
+
 void flipperham_draw_callback(Canvas *canvas, void *context)
 {
     FlipperHamApp *app = context;
     char a[16];
     uint32_t n, w, m, x;
+
+    if (app->debug_tx && app->tx_allowed && app->pkt)
+    {
+        txdbg(canvas, app);
+        return;
+    }
 
     canvas_clear(canvas);
     canvas_set_font(canvas, FontBigNumbers);
@@ -687,6 +775,10 @@ void settings_menu_build(FlipperHamApp *app)
     it = variable_item_list_add(app->settings_menu, "Custom Path", 1, NULL, NULL);
     variable_item_set_current_value_index(it, 0);
     variable_item_set_current_value_text(it, app->aprs_path_edit[0] ? app->aprs_path_edit : "");
+
+    it = variable_item_list_add(app->settings_menu, "Debug", 2, dbg_change, app);
+    variable_item_set_current_value_index(it, app->debug_tx ? 1 : 0);
+    variable_item_set_current_value_text(it, app->debug_tx ? "Yes" : "No");
 }
 
 void message_menu_build(FlipperHamApp *app)
@@ -857,6 +949,15 @@ static void aprs_path_change(VariableItem *item)
         app->aprs_path_index = 0;
 
     variable_item_set_current_value_text(item, aprs_paths[app->aprs_path_index]);
+    cfgsave(app);
+}
+
+static void dbg_change(VariableItem *item)
+{
+    FlipperHamApp *app = variable_item_get_context(item);
+
+    app->debug_tx = variable_item_get_current_value_index(item) ? true : false;
+    variable_item_set_current_value_text(item, app->debug_tx ? "Yes" : "No");
     cfgsave(app);
 }
 
