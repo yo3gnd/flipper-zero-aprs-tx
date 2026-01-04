@@ -176,6 +176,12 @@ static void stin(InputEvent *event, void *context)
 
     if (event->type != InputTypeShort)
         return;
+    if (app->debug_tx)
+        if (app->show_done)
+        {
+            app->repeat_cancel = true;
+            return;
+        }
     if (event->key != InputKeyBack)
         return;
     if (!app->repeat_wait)
@@ -539,13 +545,21 @@ void flipperham_send_hardcoded_message(FlipperHamApp *app)
     app->show_done = true;
     app->tx_done = true;
     view_port_update(app->view_port);
-    furi_delay_ms(750);
+    if (app->debug_tx)
+        while (!app->repeat_cancel)
+        {
+            view_port_update(app->view_port);
+            furi_delay_ms(50);
+        }
+    else
+        furi_delay_ms(750);
     furi_hal_power_suppress_charge_exit();
     furi_hal_light_blink_stop();
     furi_hal_light_set(LightBlue, 0);
     furi_hal_light_set(LightRed, 0);
     furi_hal_light_set(LightGreen, 0);
 
+    app->repeat_cancel = false;
     flipperham_status_view_free(app);
     free(app->pkt);
     free(app->wave);

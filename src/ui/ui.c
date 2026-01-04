@@ -16,7 +16,7 @@ static void ham_blank_input(InputEvent *event, void *context);
 static void ham_morse_play(FlipperHamApp *app);
 static void c2(void *context, uint32_t index);
 static void aprs_path_change(VariableItem *item);
-static void dbg_change(VariableItem *item);
+static void debug_change(VariableItem *item);
 static void aprs_path_custom_save(void *context);
 static const char *aprs_paths[] = {"None", "RFONLY", "NOGATE", "W1-1", "W2-2", "ARISS", "APRSAT", "Custom"};
 FlipperHamApp *gapp;
@@ -36,73 +36,81 @@ static void aprs_path_up(char *s)
 
 }
 
-static bool txdbgtype(char c)
+static const char *tx_debug_path(FlipperHamApp *app)
 {
-    switch (c)
-    {
-    case ':':
-    case '>':
-    case '!':
-    case '=':
-    case '?':
-    case ';':
-    case '@':
-    case '\'':
-    case '`':
-        return true;
-    default:
-        return false;
-    }
+    if (!app)
+        return NULL;
+    if (app->aprs_path_index >= sizeof(aprs_paths) / sizeof(aprs_paths[0]))
+        return NULL;
+    if (app->aprs_path_index == 0)
+        return NULL;
+
+
+    return aprs_paths[app->aprs_path_index];
 }
 
-static void txdbgp(Canvas *canvas, const char *s)
+static void tx_debug_src(char *out, uint16_t n, FlipperHamApp *app)
 {
-    char a[24];
-    uint8_t y, n, k;
+    const char *src = MY_CALL;
+    uint8_t ssid = 0;
 
+    if (!out || !n)
+        return;
+    out[0] = 0;
+
+    if (app && app->ham_n)
+    {
+        if (app->ham_calls[app->ham_index][0])
+            src = app->ham_calls[app->ham_index];
+        ssid = app->ham_ssid[app->ham_index];
+    }
+
+    if (ssid) snprintf(out, n, "%s-%u", src, ssid);
+    else snprintf(out, n, "%s", src);
+
+
+}
+
+static void tx_debug_packet(Canvas *canvas, FlipperHamApp *app)
+{
+    char a[40];
+    char src[16];
+    const char *s;
+    const char *path;
+
+    if (!app || !app->pkt)
+        return;
+
+    s = (const char *)app->pkt->payload;
     if (!s) return;
     if (!s[0]) return;
 
-    y = 31;
-    if (txdbgtype(s[0]))
-    {
-        a[0] = s[0];
-        a[1] = 0;
-        canvas_draw_str(canvas, 0, y, a);
-        s++;
-        y += 8;
-    }
+    path = tx_debug_path(app);
+    tx_debug_src(src, sizeof(src), app);
 
-    while (*s && y <= 63)
-    {
-        n = 0;
-        while (s[n] && n < 21)
-            n++;
-        for (k = 0; k < n; k++) a[k] = s[k];
-        a[n] = 0;
-        canvas_draw_str(canvas, 0, y, a);
-        s += n;
-        y += 8;
-    }
+    if (path) snprintf(a, sizeof(a), "%s>%s,%s:%c", src, MY_TOCALL, path, s[0]);
+    else snprintf(a, sizeof(a), "%s>%s:%c", src, MY_TOCALL, s[0]);
 
+    canvas_draw_str(canvas, 0, 31, a);
+
+    if (s[1])
+        canvas_draw_str(canvas, 0, 39, s + 1);
 
 }
 
-static void txdbg(Canvas *canvas, FlipperHamApp *app)
+static void tx_debug_draw(Canvas *canvas, FlipperHamApp *app)
 {
     char a[24];
-    uint32_t hz, khz, rem;
+    uint32_t hz;
     const char *st = app->repeat_wait ? "Wait" : "TX";
     uint8_t x;
 
     hz = tx_freq_get(app);
-    khz = hz / 1000UL;
-    rem = hz % 1000UL;
 
     canvas_clear(canvas);
     canvas_set_font(canvas, FontKeyboard);
 
-    snprintf(a, sizeof(a), "khz: %06lu.%03lu", (unsigned long)khz, (unsigned long)rem);
+    snprintf(a, sizeof(a), "khz: %06lu.%03lu", (unsigned long)(hz / 1000UL), (unsigned long)(hz % 1000UL));
     canvas_draw_str(canvas, 0, 7, a);
 
     snprintf(a, sizeof(a), "repeat %u/%u", app->repeat_i, app->repeat_n);
@@ -112,7 +120,7 @@ static void txdbg(Canvas *canvas, FlipperHamApp *app)
     canvas_draw_str(canvas, x, 15, st);
 
     if (app->pkt)
-        txdbgp(canvas, (const char *)app->pkt->payload);
+        tx_debug_packet(canvas, app);
 
 
 }
@@ -125,7 +133,7 @@ void flipperham_draw_callback(Canvas *canvas, void *context)
 
     if (app->debug_tx && app->tx_allowed && app->pkt)
     {
-        txdbg(canvas, app);
+        tx_debug_draw(canvas, app);
         return;
     }
 
@@ -776,7 +784,7 @@ void settings_menu_build(FlipperHamApp *app)
     variable_item_set_current_value_index(it, 0);
     variable_item_set_current_value_text(it, app->aprs_path_edit[0] ? app->aprs_path_edit : "");
 
-    it = variable_item_list_add(app->settings_menu, "Debug", 2, dbg_change, app);
+    it = variable_item_list_add(app->settings_menu, "Debug", 2, debug_change, app);
     variable_item_set_current_value_index(it, app->debug_tx ? 1 : 0);
     variable_item_set_current_value_text(it, app->debug_tx ? "Yes" : "No");
 }
@@ -952,7 +960,7 @@ static void aprs_path_change(VariableItem *item)
     cfgsave(app);
 }
 
-static void dbg_change(VariableItem *item)
+static void debug_change(VariableItem *item)
 {
     FlipperHamApp *app = variable_item_get_context(item);
 
