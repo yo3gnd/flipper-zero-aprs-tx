@@ -71,12 +71,53 @@ static void tx_debug_src(char *out, uint16_t n, FlipperHamApp *app)
 
 }
 
+static void tx_debug_wrap(Canvas *canvas, uint8_t *y, const char *s)
+{
+    char a[24];
+    uint8_t i, k, n;
+
+    if (!canvas || !y || !s)
+        return;
+
+    while (*s && *y <= 63)
+    {
+        n = 0;
+        k = 0;
+        while (s[n] && n < 21)
+        {
+            if (s[n] == ' ')
+                k = n;
+            n++;
+        }
+
+        if (!s[n])
+            ;
+        else if (k)
+            n = k;
+
+        if (!n)
+            n = 21;
+
+        for (i = 0; i < n; i++)
+            a[i] = s[i];
+        a[n] = 0;
+        canvas_draw_str(canvas, 0, *y, a);
+        *y += 8;
+        s += n;
+        while (*s == ' ')
+            s++;
+    }
+
+
+}
+
 static void tx_debug_packet(Canvas *canvas, FlipperHamApp *app)
 {
     char a[40];
     char src[16];
     const char *s;
     const char *path;
+    uint8_t y;
 
     if (!app || !app->pkt)
         return;
@@ -91,10 +132,13 @@ static void tx_debug_packet(Canvas *canvas, FlipperHamApp *app)
     if (path) snprintf(a, sizeof(a), "%s>%s,%s:%c", src, MY_TOCALL, path, s[0]);
     else snprintf(a, sizeof(a), "%s>%s:%c", src, MY_TOCALL, s[0]);
 
-    canvas_draw_str(canvas, 0, 31, a);
+    y = 29;
+    tx_debug_wrap(canvas, &y, a);
+    if (y == 37)
+        y = 39;
 
     if (s[1])
-        canvas_draw_str(canvas, 0, 39, s + 1);
+        tx_debug_wrap(canvas, &y, s + 1);
 
 }
 
@@ -792,6 +836,7 @@ void settings_menu_build(FlipperHamApp *app)
 void message_menu_build(FlipperHamApp *app)
 {
     uint8_t i;
+    bool f;
 
     submenu_reset(app->message_menu);
     submenu_add_item(app->message_menu, "Add new...", FlipperHamMessageIndexAdd, m, app);
@@ -808,14 +853,36 @@ void message_menu_build(FlipperHamApp *app)
     }
 
     submenu_set_selected_item(app->message_menu, FlipperHamMessageIndexAdd);
-    if (app->message_sel >= FlipperHamMessageIndexBase)
+    f = false;
+    if (app->message_last_tx < TXT_N)
+        if (app->message_used[app->message_last_tx])
+            if (app->message[app->message_last_tx][0])
+            {
+                submenu_set_selected_item(app->message_menu,
+                                          FlipperHamMessageIndexBase + app->message_last_tx);
+                f = true;
+            }
+
+    if (!f && app->message_sel >= FlipperHamMessageIndexBase)
     {
         i = app->message_sel - FlipperHamMessageIndexBase;
         if (i < TXT_N)
             if (app->message_used[i])
                 if (app->message[i][0])
+                {
                     submenu_set_selected_item(app->message_menu, app->message_sel);
+                    f = true;
+                }
     }
+
+    if (!f)
+        for (i = 0; i < TXT_N; i++)
+            if (app->message_used[i])
+                if (app->message[i][0])
+                {
+                    submenu_set_selected_item(app->message_menu, FlipperHamMessageIndexBase + i);
+                    break;
+                }
 }
 
 void position_menu_build(FlipperHamApp *app)
@@ -1065,6 +1132,8 @@ void ssid_enter(void *context, uint32_t index)
     UNUSED(index);
     app->call_sel = FlipperHamCallIndexBase + app->dst_call_index;
     app->message_sel = FlipperHamMessageIndexBase + app->tx_msg_index;
+    if (app->tx_type == 2)
+        app->message_last_tx = app->tx_msg_index;
 
     app->return_view = FlipperHamViewMessage;
     app->send_requested = true;

@@ -257,6 +257,7 @@ FlipperHamApp *flipperham_app_alloc(void)
     memset(app->ham_calls, 0, sizeof(app->ham_calls));
     app->status_index = 0;
     app->message_index = 0;
+    app->message_last_tx = 0xff;
     app->pos_index = 0;
     app->dst_call_index = 0;
     app->dst_ssid = 0;

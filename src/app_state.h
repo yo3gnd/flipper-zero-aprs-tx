@@ -107,6 +107,7 @@ typedef struct FlipperHamApp
     uint8_t bulletin_index;
     uint8_t status_index;
     uint8_t message_index;
+    uint8_t message_last_tx;
     uint8_t pos_index;
     uint8_t dst_call_index;
     uint8_t dst_ssid;
