@@ -648,7 +648,7 @@ void call_menu_build(FlipperHamApp *app)
 
     submenu_reset(app->call_menu);
     if (app->tx_type == 2)
-        submenu_set_header(app->call_menu, "Destination:");
+        submenu_set_header(app->call_menu, "Destination");
     else
         submenu_set_header(app->call_menu, NULL);
     submenu_add_item(app->call_menu, "Add new callsign...", FlipperHamCallIndexAdd, cl, app);
@@ -839,6 +839,7 @@ void message_menu_build(FlipperHamApp *app)
     bool f;
 
     submenu_reset(app->message_menu);
+    submenu_set_header(app->message_menu, "Select Message");
     submenu_add_item(app->message_menu, "Add new...", FlipperHamMessageIndexAdd, m, app);
 
     for (i = 0; i < TXT_N; i++)

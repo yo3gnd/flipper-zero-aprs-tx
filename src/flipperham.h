@@ -69,6 +69,7 @@ enum
     FlipperHamViewBulletin,
     FlipperHamViewStatus,
     FlipperHamViewMessage,
+    FlipperHamViewMessageEdit,
     FlipperHamViewPosition,
     FlipperHamViewSsid,
     FlipperHamViewCall,

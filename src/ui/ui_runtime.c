@@ -43,6 +43,7 @@ void flipperham_menu_free(FlipperHamApp *app)
         view_dispatcher_remove_view(app->view_dispatcher, FlipperHamViewBulletin);
         view_dispatcher_remove_view(app->view_dispatcher, FlipperHamViewStatus);
         view_dispatcher_remove_view(app->view_dispatcher, FlipperHamViewMessage);
+        view_dispatcher_remove_view(app->view_dispatcher, FlipperHamViewMessageEdit);
         view_dispatcher_remove_view(app->view_dispatcher, FlipperHamViewPosition);
         view_dispatcher_remove_view(app->view_dispatcher, FlipperHamViewCall);
         view_dispatcher_remove_view(app->view_dispatcher, FlipperHamViewBook);
@@ -105,6 +106,12 @@ void flipperham_menu_free(FlipperHamApp *app)
     {
         submenu_free(app->message_menu);
         app->message_menu = NULL;
+    }
+
+    if (app->message_edit_menu)
+    {
+        submenu_free(app->message_edit_menu);
+        app->message_edit_menu = NULL;
     }
 
     if (app->position_menu)
@@ -217,6 +224,7 @@ FlipperHamApp *flipperham_app_alloc(void)
     app->bulletin_menu = submenu_alloc();
     app->status_menu = submenu_alloc();
     app->message_menu = submenu_alloc();
+    app->message_edit_menu = submenu_alloc();
     app->position_menu = submenu_alloc();
     app->call_menu = submenu_alloc();
     app->book_menu = submenu_alloc();
@@ -383,6 +391,8 @@ FlipperHamApp *flipperham_app_alloc(void)
                              submenu_get_view(app->status_menu));
     view_dispatcher_add_view(app->view_dispatcher, FlipperHamViewMessage,
                              submenu_get_view(app->message_menu));
+    view_dispatcher_add_view(app->view_dispatcher, FlipperHamViewMessageEdit,
+                             submenu_get_view(app->message_edit_menu));
     view_dispatcher_add_view(app->view_dispatcher, FlipperHamViewPosition,
                              submenu_get_view(app->position_menu));
     view_dispatcher_add_view(app->view_dispatcher, FlipperHamViewCall,

@@ -9,6 +9,50 @@
 #include <stdlib.h>
 #include <string.h>
 
+static void msgactbuild(FlipperHamApp *app);
+static void msgactdead(void *context);
+static void msgactdo(void *context, uint32_t index);
+
+static void msgactbuild(FlipperHamApp *app)
+{
+    submenu_reset(app->message_edit_menu);
+    submenu_set_header(app->message_edit_menu, "Edit Message");
+    submenu_add_item(app->message_edit_menu, "Edit", FlipperHamC2IndexEdit, msgactdo, app);
+    submenu_add_item(app->message_edit_menu, "Copy", FlipperHamC2IndexCopy, msgactdo, app);
+    if (app->message_n <= 1)
+        ;
+    else
+        submenu_add_item(app->message_edit_menu, "Delete", FlipperHamC2IndexDelete, msgactdo, app);
+    submenu_set_selected_item(app->message_edit_menu, FlipperHamC2IndexEdit);
+}
+
+static void msgactdead(void *context)
+{
+    FlipperHamApp *app = context;
+
+    msgactbuild(app);
+    view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewMessageEdit);
+}
+
+static void msgactdo(void *context, uint32_t index)
+{
+    FlipperHamApp *app = context;
+
+    if (index != FlipperHamC2IndexEdit)
+        return;
+    if (app->message_index >= TXT_N)
+        return;
+
+    snprintf(app->m_edit, sizeof(app->m_edit), "%s", app->message[app->message_index]);
+    app->text_mode = 3;
+    app->text_view = FlipperHamViewMessageEdit;
+    text_input_reset(app->text_input);
+    text_input_set_header_text(app->text_input, "Edit Message");
+    text_input_set_result_callback(app->text_input, msgactdead, app, app->m_edit,
+                                   sizeof(app->m_edit), false);
+    view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewTextInput);
+}
+
 void m(void *context, uint32_t index)
 {
     FlipperHamApp *app = context;
@@ -82,14 +126,8 @@ void message_pick(void *context, InputType input_type, uint32_t index)
 
     app->message_sel = index;
     app->message_index = i;
-    snprintf(app->m_edit, sizeof(app->m_edit), "%s", app->message[i]);
-    app->text_mode = 3;
-    app->text_view = FlipperHamViewMessage;
-    text_input_reset(app->text_input);
-    text_input_set_header_text(app->text_input, "Edit message");
-    text_input_set_result_callback(app->text_input, message_save, app, app->m_edit,
-                                   sizeof(app->m_edit), false);
-    view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewTextInput);
+    msgactbuild(app);
+    view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewMessageEdit);
 }
 
 void message_save(void *context)
