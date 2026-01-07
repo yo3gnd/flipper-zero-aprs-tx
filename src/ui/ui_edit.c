@@ -10,8 +10,9 @@
 #include <string.h>
 
 static void msgactbuild(FlipperHamApp *app);
-static void msgactdead(void *context);
+static void msgactsave(void *context);
 static void msgactdo(void *context, uint32_t index);
+static bool msgcopy(FlipperHamApp *app);
 
 static void msgactbuild(FlipperHamApp *app)
 {
@@ -26,9 +27,62 @@ static void msgactbuild(FlipperHamApp *app)
     submenu_set_selected_item(app->message_edit_menu, FlipperHamC2IndexEdit);
 }
 
-static void msgactdead(void *context)
+static bool msgcopy(FlipperHamApp *app)
+{
+    char a[TXT_LEN];
+    uint8_t i, j;
+
+    if (!app)
+        return false;
+    if (app->message_index >= TXT_N)
+        return false;
+    if (!app->message[app->message_index][0])
+        return false;
+
+    snprintf(a, sizeof(a), "%s", app->message[app->message_index]);
+
+    for (i = 0; i < TXT_N; i++)
+        if (!app->message_used[i] || !app->message[i][0])
+        {
+            snprintf(app->message[i], sizeof(app->message[i]), "%s", a);
+            app->message_used[i] = 1;
+            app->message_sel = FlipperHamMessageIndexBase + i;
+            app->message_index = i;
+            for (j = 0; j < TXT_N; j++)
+                if (app->message_used[j])
+                    if (app->message[j][0])
+                        break;
+            message_fix(app);
+            cfgsave(app);
+            message_menu_build(app);
+            return true;
+        }
+
+
+    return false;
+}
+
+static void msgactsave(void *context)
 {
     FlipperHamApp *app = context;
+    uint8_t i;
+
+    if (!app)
+        return;
+
+    i = app->message_index;
+    if (i >= TXT_N)
+        return;
+
+    if (app->m_edit[0])
+    {
+        snprintf(app->message[i], sizeof(app->message[i]), "%s", app->m_edit);
+        app->message_used[i] = 1;
+        app->message_sel = FlipperHamMessageIndexBase + i;
+        message_fix(app);
+        cfgsave(app);
+        message_menu_build(app);
+    }
 
     msgactbuild(app);
     view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewMessageEdit);
@@ -37,6 +91,14 @@ static void msgactdead(void *context)
 static void msgactdo(void *context, uint32_t index)
 {
     FlipperHamApp *app = context;
+
+    if (index == FlipperHamC2IndexCopy)
+    {
+        msgcopy(app);
+        msgactbuild(app);
+        view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewMessageEdit);
+        return;
+    }
 
     if (index != FlipperHamC2IndexEdit)
         return;
@@ -48,7 +110,7 @@ static void msgactdo(void *context, uint32_t index)
     app->text_view = FlipperHamViewMessageEdit;
     text_input_reset(app->text_input);
     text_input_set_header_text(app->text_input, "Edit Message");
-    text_input_set_result_callback(app->text_input, msgactdead, app, app->m_edit,
+    text_input_set_result_callback(app->text_input, msgactsave, app, app->m_edit,
                                    sizeof(app->m_edit), false);
     view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewTextInput);
 }
