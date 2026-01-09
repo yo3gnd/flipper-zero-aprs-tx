@@ -118,7 +118,7 @@ const FlipperHamPreset flipperham_presets[] = {
 
 static const char *aprs_path_pick(FlipperHamApp *app)
 {
-    static const char *paths[] = {"None", "RFONLY", "NOGATE", "W1-1", "W2-2", "ARISS", "APRSAT", "Custom"};
+    static const char *paths[] = {"None", "RFONLY", "NOGATE", "WIDE1-1", "WIDE2-2", "ARISS", "APRSAT", "Custom"};
 
     if (!app)
         return NULL;

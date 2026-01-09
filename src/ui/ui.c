@@ -38,15 +38,17 @@ static void aprs_path_up(char *s)
 
 static const char *tx_debug_path(FlipperHamApp *app)
 {
+    static const char *a[] = {"None", "RFONLY", "NOGATE", "WIDE1-1", "WIDE2-2", "ARISS", "APRSAT", "Custom"};
+
     if (!app)
         return NULL;
-    if (app->aprs_path_index >= sizeof(aprs_paths) / sizeof(aprs_paths[0]))
+    if (app->aprs_path_index >= sizeof(a) / sizeof(a[0]))
         return NULL;
     if (app->aprs_path_index == 0)
         return NULL;
 
 
-    return aprs_paths[app->aprs_path_index];
+    return a[app->aprs_path_index];
 }
 
 static void tx_debug_src(char *out, uint16_t n, FlipperHamApp *app)
