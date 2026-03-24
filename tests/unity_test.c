@@ -1,4 +1,6 @@
+#ifndef UNITY_INCLUDE_PRINT_FORMATTED
 #define UNITY_INCLUDE_PRINT_FORMATTED
+#endif
 
 #include "unity/unity.h"
 #include "../src/aprs.h"

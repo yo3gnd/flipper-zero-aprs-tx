@@ -1,7 +1,7 @@
 /* =========================================================================
     Unity - A Test Framework for C
     ThrowTheSwitch.org
-    Copyright (c) 2007-25 Mike Karlesky, Mark VanderVoord, & Greg Williams
+    Copyright (c) 2007-26 Mike Karlesky, Mark VanderVoord, & Greg Williams
     SPDX-License-Identifier: MIT
 ========================================================================= */
 
@@ -432,6 +432,10 @@ typedef UNITY_FLOAT_TYPE UNITY_FLOAT;
 #define UNITY_PRINT_EXEC_TIME() do { /* nothing*/ } while (0)
 #endif
 
+#ifndef UNITY_FAILURE_DETAIL_SEPARATOR
+#define UNITY_FAILURE_DETAIL_SEPARATOR ":"
+#endif
+
 /*-------------------------------------------------------
  * Footprint
  *-------------------------------------------------------*/
@@ -445,7 +449,7 @@ typedef UNITY_FLOAT_TYPE UNITY_FLOAT;
 #endif
 
 /*-------------------------------------------------------
- * Internal Structs Needed
+ * Internal Types Needed
  *-------------------------------------------------------*/
 
 typedef void (*UnityTestFunction)(void);
@@ -528,6 +532,10 @@ typedef enum
 #endif
 #endif
 
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpadded"
+#endif
 struct UNITY_STORAGE_T
 {
     const char* TestFile;
@@ -556,6 +564,9 @@ struct UNITY_STORAGE_T
     jmp_buf AbortFrame;
 #endif
 };
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
 
 extern struct UNITY_STORAGE_T Unity;
 
@@ -857,6 +868,7 @@ extern const char UnityStrErrFloat[];
 extern const char UnityStrErrDouble[];
 extern const char UnityStrErr64[];
 extern const char UnityStrErrShorthand[];
+extern const char UnityStrErrDetailStack[];
 
 /*-------------------------------------------------------
  * Test Running Macros
