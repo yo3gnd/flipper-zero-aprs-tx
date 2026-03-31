@@ -23,6 +23,7 @@ typedef struct FlipperHamApp
     Submenu *message_menu;
     Submenu *message_edit_menu;
     Submenu *position_menu;
+    Submenu *pos_action_menu;
     Submenu *call_menu;
     Submenu *book_menu;
     Submenu *c2_menu;

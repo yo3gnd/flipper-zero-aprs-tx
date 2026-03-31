@@ -13,6 +13,10 @@ static void msgactbuild(FlipperHamApp *app);
 static void msgactsave(void *context);
 static void msgactdo(void *context, uint32_t index);
 static bool msgcopy(FlipperHamApp *app);
+static void msgdel(FlipperHamApp *app);
+static void posactbuild(FlipperHamApp *app);
+static void posactdo(void *context, uint32_t index);
+static void posdel(FlipperHamApp *app);
 
 static void msgactbuild(FlipperHamApp *app)
 {
@@ -27,10 +31,106 @@ static void msgactbuild(FlipperHamApp *app)
     submenu_set_selected_item(app->message_edit_menu, FlipperHamC2IndexEdit);
 }
 
+static void posactbuild(FlipperHamApp *app)
+{
+    submenu_reset(app->pos_action_menu);
+    submenu_set_header(app->pos_action_menu, "Edit GPS Position");
+    submenu_add_item(app->pos_action_menu, "Edit name", FlipperHamPosEditIndexName, posactdo, app);
+    submenu_add_item(app->pos_action_menu, "Edit latitude", FlipperHamPosEditIndexLat, posactdo, app);
+    submenu_add_item(app->pos_action_menu, "Edit longitude", FlipperHamPosEditIndexLon, posactdo, app);
+    if (app->pos_n > 1)
+        if (app->pos_index < TXT_N)
+            if (app->pos_used[app->pos_index])
+                submenu_add_item(app->pos_action_menu, "Delete", FlipperHamPosEditIndexDelete, posactdo, app);
+    submenu_set_selected_item(app->pos_action_menu, FlipperHamPosEditIndexName);
+}
+
+static void posdel(FlipperHamApp *app)
+{
+    uint8_t i;
+
+    if (!app)
+        return;
+    if (app->pos_n <= 1)
+        return;
+    if (app->pos_index >= TXT_N)
+        return;
+
+    app->pos_name[app->pos_index][0] = 0;
+    app->pos_lat[app->pos_index][0] = 0;
+    app->pos_lon[app->pos_index][0] = 0;
+    app->pos_used[app->pos_index] = 0;
+    app->position_sel = FlipperHamPositionIndexAdd;
+
+    for (i = app->pos_index; i < TXT_N; i++)
+        if (app->pos_used[i])
+            if (app->pos_name[i][0])
+            {
+                app->position_sel = FlipperHamPositionIndexBase + i;
+                break;
+            }
+
+    if (app->position_sel == FlipperHamPositionIndexAdd)
+        for (i = app->pos_index; i > 0; i--)
+            if (app->pos_used[i - 1])
+                if (app->pos_name[i - 1][0])
+                {
+                    app->position_sel = FlipperHamPositionIndexBase + i - 1;
+                    break;
+                }
+
+    position_fix(app);
+    cfgsave(app);
+    position_menu_build(app);
+}
+
+static void posactdo(void *context, uint32_t index)
+{
+    FlipperHamApp *app = context;
+    const char *title;
+    char *out;
+    uint16_t n;
+
+    if (index == FlipperHamPosEditIndexDelete)
+    {
+        posdel(app);
+        view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewPosition);
+        return;
+    }
+
+    title = "Name";
+    out = app->p_name_edit;
+    n = sizeof(app->p_name_edit);
+    app->text_mode = 6;
+
+    if (index == FlipperHamPosEditIndexLat)
+    {
+        title = "Edit latitude";
+        out = app->p_lat_edit;
+        n = sizeof(app->p_lat_edit);
+        app->text_mode = 7;
+    }
+    else if (index == FlipperHamPosEditIndexLon)
+    {
+        title = "Edit longitude";
+        out = app->p_lon_edit;
+        n = sizeof(app->p_lon_edit);
+        app->text_mode = 8;
+    }
+    else
+        title = "Edit name";
+
+    app->text_view = FlipperHamViewPosAction;
+    text_input_reset(app->text_input);
+    text_input_set_header_text(app->text_input, title);
+    text_input_set_result_callback(app->text_input, position_save, app, out, n, false);
+    view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewTextInput);
+}
+
 static bool msgcopy(FlipperHamApp *app)
 {
     char a[TXT_LEN];
-    uint8_t i, j;
+    uint8_t i;
 
     if (!app)
         return false;
@@ -48,10 +148,6 @@ static bool msgcopy(FlipperHamApp *app)
             app->message_used[i] = 1;
             app->message_sel = FlipperHamMessageIndexBase + i;
             app->message_index = i;
-            for (j = 0; j < TXT_N; j++)
-                if (app->message_used[j])
-                    if (app->message[j][0])
-                        break;
             message_fix(app);
             cfgsave(app);
             message_menu_build(app);
@@ -84,8 +180,48 @@ static void msgactsave(void *context)
         message_menu_build(app);
     }
 
-    msgactbuild(app);
-    view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewMessageEdit);
+    view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewMessage);
+}
+
+static void msgdel(FlipperHamApp *app)
+{
+    uint8_t i, j;
+
+    if (!app)
+        return;
+    if (app->message_n <= 1)
+        return;
+    i = app->message_index;
+    if (i >= TXT_N)
+        return;
+
+    app->message[i][0] = 0;
+    app->message_used[i] = 0;
+    app->message_sel = FlipperHamMessageIndexAdd;
+
+    for (j = i; j < TXT_N; j++)
+        if (app->message_used[j])
+            if (app->message[j][0])
+            {
+                app->message_sel = FlipperHamMessageIndexBase + j;
+                break;
+            }
+
+    if (app->message_sel == FlipperHamMessageIndexAdd)
+        for (j = i; j > 0; j--)
+            if (app->message_used[j - 1])
+                if (app->message[j - 1][0])
+                {
+                    app->message_sel = FlipperHamMessageIndexBase + j - 1;
+                    break;
+                }
+
+    if (app->message_last_tx == i)
+        app->message_last_tx = 0xff;
+
+    message_fix(app);
+    cfgsave(app);
+    message_menu_build(app);
 }
 
 static void msgactdo(void *context, uint32_t index)
@@ -95,8 +231,14 @@ static void msgactdo(void *context, uint32_t index)
     if (index == FlipperHamC2IndexCopy)
     {
         msgcopy(app);
-        msgactbuild(app);
-        view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewMessageEdit);
+        view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewMessage);
+        return;
+    }
+
+    if (index == FlipperHamC2IndexDelete)
+    {
+        msgdel(app);
+        view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewMessage);
         return;
     }
 
@@ -297,8 +439,8 @@ void position_pick(void *context, InputType input_type, uint32_t index)
     snprintf(app->p_name_edit, sizeof(app->p_name_edit), "%s", app->pos_name[i]);
     snprintf(app->p_lat_edit, sizeof(app->p_lat_edit), "%s", app->pos_lat[i]);
     snprintf(app->p_lon_edit, sizeof(app->p_lon_edit), "%s", app->pos_lon[i]);
-    pos_edit_menu_build(app);
-    view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewPosEdit);
+    posactbuild(app);
+    view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewPosAction);
 }
 
 void position_save(void *context)
@@ -306,6 +448,7 @@ void position_save(void *context)
     FlipperHamApp *app = context;
     uint8_t i, j;
     char a[POS_LEN];
+    uint32_t v;
 
     i = app->pos_index;
     if (i >= TXT_N)
@@ -364,7 +507,15 @@ void position_save(void *context)
     cfgsave(app);
     position_menu_build(app);
     pos_edit_menu_build(app);
-    view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewPosEdit);
+    v = app->text_view;
+    if (v == FlipperHamViewPosAction)
+    {
+        if (app->pos_used[i] && app->pos_name[i][0])
+            posactbuild(app);
+        else
+            v = FlipperHamViewPosition;
+    }
+    view_dispatcher_switch_to_view(app->view_dispatcher, v);
 }
 
 void flipperham_bulletin_callback(void *context, uint32_t index)

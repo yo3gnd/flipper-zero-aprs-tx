@@ -51,6 +51,7 @@ void flipperham_menu_free(FlipperHamApp *app)
         view_dispatcher_remove_view(app->view_dispatcher, FlipperHamViewFreq);
         view_dispatcher_remove_view(app->view_dispatcher, FlipperHamViewFreqEdit);
         view_dispatcher_remove_view(app->view_dispatcher, FlipperHamViewPosEdit);
+        view_dispatcher_remove_view(app->view_dispatcher, FlipperHamViewPosAction);
         view_dispatcher_remove_view(app->view_dispatcher, FlipperHamViewSsid);
         view_dispatcher_remove_view(app->view_dispatcher, FlipperHamViewHam);
         view_dispatcher_remove_view(app->view_dispatcher, FlipperHamViewHamTx);
@@ -118,6 +119,12 @@ void flipperham_menu_free(FlipperHamApp *app)
     {
         submenu_free(app->position_menu);
         app->position_menu = NULL;
+    }
+
+    if (app->pos_action_menu)
+    {
+        submenu_free(app->pos_action_menu);
+        app->pos_action_menu = NULL;
     }
 
     if (app->call_menu)
@@ -226,6 +233,7 @@ FlipperHamApp *flipperham_app_alloc(void)
     app->message_menu = submenu_alloc();
     app->message_edit_menu = submenu_alloc();
     app->position_menu = submenu_alloc();
+    app->pos_action_menu = submenu_alloc();
     app->call_menu = submenu_alloc();
     app->book_menu = submenu_alloc();
     app->c2_menu = submenu_alloc();
@@ -352,6 +360,8 @@ FlipperHamApp *flipperham_app_alloc(void)
     view_set_previous_callback(submenu_get_view(app->status_menu), flipperham_status_exit_callback);
     view_set_previous_callback(submenu_get_view(app->message_menu),
                                flipperham_message_exit_callback);
+    view_set_previous_callback(submenu_get_view(app->message_edit_menu),
+                               flipperham_message_edit_exit_callback);
     view_set_previous_callback(submenu_get_view(app->position_menu),
                                flipperham_position_exit_callback);
     view_set_previous_callback(submenu_get_view(app->call_menu), flipperham_call_exit_callback);
@@ -362,6 +372,8 @@ FlipperHamApp *flipperham_app_alloc(void)
                                flipperham_freq_edit_exit_callback);
     view_set_previous_callback(variable_item_list_get_view(app->pos_edit_menu),
                                flipperham_pos_edit_exit_callback);
+    view_set_previous_callback(submenu_get_view(app->pos_action_menu),
+                               flipperham_pos_action_exit_callback);
     view_set_previous_callback(variable_item_list_get_view(app->ssid_menu),
                                flipperham_ssid_exit_callback);
     view_set_previous_callback(variable_item_list_get_view(app->ham_menu),
@@ -407,6 +419,8 @@ FlipperHamApp *flipperham_app_alloc(void)
                              variable_item_list_get_view(app->freq_edit_menu));
     view_dispatcher_add_view(app->view_dispatcher, FlipperHamViewPosEdit,
                              variable_item_list_get_view(app->pos_edit_menu));
+    view_dispatcher_add_view(app->view_dispatcher, FlipperHamViewPosAction,
+                             submenu_get_view(app->pos_action_menu));
     view_dispatcher_add_view(app->view_dispatcher, FlipperHamViewSsid,
                              variable_item_list_get_view(app->ssid_menu));
     view_dispatcher_add_view(app->view_dispatcher, FlipperHamViewHam,

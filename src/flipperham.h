@@ -79,6 +79,7 @@ enum
     FlipperHamViewFreq,
     FlipperHamViewFreqEdit,
     FlipperHamViewPosEdit,
+    FlipperHamViewPosAction,
     FlipperHamViewHam,
     FlipperHamViewHamTx,
     FlipperHamViewReadme,
@@ -144,6 +145,14 @@ enum
 {
     FlipperHamPositionIndexAdd = 0,
     FlipperHamPositionIndexBase = 450,
+};
+
+enum
+{
+    FlipperHamPosEditIndexName = 0,
+    FlipperHamPosEditIndexLat,
+    FlipperHamPosEditIndexLon,
+    FlipperHamPosEditIndexDelete,
 };
 
 enum

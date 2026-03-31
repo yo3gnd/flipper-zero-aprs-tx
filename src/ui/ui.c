@@ -482,6 +482,13 @@ uint32_t flipperham_pos_edit_exit_callback(void *context)
     return FlipperHamViewPosition;
 }
 
+uint32_t flipperham_pos_action_exit_callback(void *context)
+{
+    UNUSED(context);
+
+    return FlipperHamViewPosition;
+}
+
 uint32_t flipperham_ham_exit_callback(void *context)
 {
     UNUSED(context);
@@ -930,28 +937,12 @@ void pos_edit_menu_build(FlipperHamApp *app)
     const char *name_label;
     const char *lat_label;
     const char *lon_label;
-    bool hdr;
 
     variable_item_list_reset(app->pos_edit_menu);
 
     name_label = "Name";
     lat_label = "Latitude";
     lon_label = "Longitude";
-    hdr = false;
-    if (app->position_sel >= FlipperHamPositionIndexBase)
-    {
-        name_label = "Edit name";
-        lat_label = "Edit latitude";
-        lon_label = "Edit longitude";
-        hdr = true;
-    }
-
-    if (hdr)
-    {
-        it = variable_item_list_add(app->pos_edit_menu, "Edit GPS Position", 1, NULL, NULL);
-        variable_item_set_current_value_index(it, 0);
-        variable_item_set_current_value_text(it, "");
-    }
 
     it = variable_item_list_add(app->pos_edit_menu, name_label, 1, NULL, NULL);
     variable_item_set_current_value_index(it, 0);
@@ -970,7 +961,7 @@ void pos_edit_menu_build(FlipperHamApp *app)
             if (app->pos_used[app->pos_index])
                 variable_item_list_add(app->pos_edit_menu, "Delete", 1, NULL, NULL);
 
-    variable_item_list_set_selected_item(app->pos_edit_menu, hdr ? 1 : 0);
+    variable_item_list_set_selected_item(app->pos_edit_menu, 0);
 }
 
 void ssidfix(FlipperHamApp *app)
@@ -1237,13 +1228,6 @@ void pos_edit_enter(void *context, uint32_t index)
 {
     FlipperHamApp *app = context;
     bool a;
-
-    if (app->position_sel >= FlipperHamPositionIndexBase)
-    {
-        if (index == 0)
-            return;
-        index--;
-    }
 
     a = false;
     if (app->pos_n > 1)
