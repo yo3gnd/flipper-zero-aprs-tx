@@ -604,6 +604,7 @@ void bulletin_menu_build(FlipperHamApp *app)
     uint8_t i;
 
     submenu_reset(app->bulletin_menu);
+    submenu_set_header(app->bulletin_menu, "Select Bulleting");
     submenu_add_item(app->bulletin_menu, "Add new...", FlipperHamBulletinIndexAdd,
                      flipperham_bulletin_callback, app);
 
@@ -634,6 +635,7 @@ void status_menu_build(FlipperHamApp *app)
     uint8_t i;
 
     submenu_reset(app->status_menu);
+    submenu_set_header(app->status_menu, "Select Status Message");
     submenu_add_item(app->status_menu, "Add new...", FlipperHamStatusIndexAdd, st, app);
 
     for (i = 0; i < TXT_N; i++)
@@ -907,6 +909,7 @@ void position_menu_build(FlipperHamApp *app)
     uint8_t i;
 
     submenu_reset(app->position_menu);
+    submenu_set_header(app->position_menu, "Select Position");
     submenu_add_item(app->position_menu, "Add new...", FlipperHamPositionIndexAdd, p, app);
 
     for (i = 0; i < TXT_N; i++)
