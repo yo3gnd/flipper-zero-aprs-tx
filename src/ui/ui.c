@@ -698,6 +698,7 @@ void book_menu_build(FlipperHamApp *app)
     uint8_t i;
 
     submenu_reset(app->book_menu);
+    submenu_set_header(app->book_menu, "Callbook");
     submenu_add_item(app->book_menu, "Add new callsign...", FlipperHamBookIndexAdd, cb, app);
 
     for (i = 0; i < CALL_N; i++)
