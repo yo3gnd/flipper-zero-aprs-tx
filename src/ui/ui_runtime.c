@@ -198,10 +198,14 @@ static void stin(InputEvent *event, void *context)
         }
     if (event->key != InputKeyBack)
         return;
-    if (!app->repeat_wait)
-        return;
 
     app->repeat_cancel = true;
+    if (app->tx_started && !app->tx_done)
+    {
+        flipperham_radio_stop(app);
+        app->tx_started = false;
+        app->tx_done = true;
+    }
 }
 
 static void tx_blink_green(void)
@@ -458,6 +462,7 @@ void flipperham_send_hardcoded_message(FlipperHamApp *app)
     static const uint32_t a[] = {0, 2000, 4000, 8000, 15000};
     uint8_t i;
     uint32_t b, c;
+    bool stopnow;
 
     if (!app->pkt)
         app->pkt = malloc(sizeof(Packet));
@@ -565,19 +570,28 @@ void flipperham_send_hardcoded_message(FlipperHamApp *app)
             break;
     }
 
+    stopnow = app->repeat_cancel;
     app->repeat_wait = false;
     app->repeat_cancel = false;
-    app->show_done = true;
-    app->tx_done = true;
-    view_port_update(app->view_port);
-    if (app->debug_tx)
-        while (!app->repeat_cancel)
-        {
-            view_port_update(app->view_port);
-            furi_delay_ms(50);
-        }
+    if (!stopnow)
+    {
+        app->show_done = true;
+        app->tx_done = true;
+        view_port_update(app->view_port);
+        if (app->debug_tx)
+            while (!app->repeat_cancel)
+            {
+                view_port_update(app->view_port);
+                furi_delay_ms(50);
+            }
+        else
+            furi_delay_ms(750);
+    }
     else
-        furi_delay_ms(750);
+    {
+        app->show_done = false;
+        app->tx_done = true;
+    }
     furi_hal_power_suppress_charge_exit();
     furi_hal_light_blink_stop();
     furi_hal_light_set(LightBlue, 0);

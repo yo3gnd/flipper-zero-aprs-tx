@@ -480,5 +480,6 @@ void flipperham_radio_stop(FlipperHamApp *app)
     if (app->tx_started)
         furi_hal_subghz_stop_async_tx();
 
+    app->tx_started = false;
     furi_hal_subghz_sleep();
 }
