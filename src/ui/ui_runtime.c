@@ -9,13 +9,13 @@
 #include <stdlib.h>
 #include <string.h>
 
-static void stin(InputEvent *event, void *context);
+static void status_input(InputEvent *event, void *context);
 
 void flipperham_status_view_alloc(FlipperHamApp *app)
 {
     app->view_port = view_port_alloc();
     view_port_draw_callback_set(app->view_port, flipperham_draw_callback, app);
-    view_port_input_callback_set(app->view_port, stin, app);
+    view_port_input_callback_set(app->view_port, status_input, app);
     gui_add_view_port(app->gui, app->view_port, GuiLayerFullscreen);
 }
 
@@ -184,18 +184,17 @@ void flipperham_menu_free(FlipperHamApp *app)
     splash_view_free(app);
 }
 
-static void stin(InputEvent *event, void *context)
+static void status_input(InputEvent *event, void *context)
 {
     FlipperHamApp *app = context;
 
     if (event->type != InputTypeShort)
         return;
-    if (app->debug_tx)
-        if (app->show_done)
-        {
-            app->repeat_cancel = true;
-            return;
-        }
+    if (app->debug_tx && app->show_done)
+    {
+        app->repeat_cancel = true;
+        return;
+    }
     if (event->key != InputKeyBack)
         return;
 
@@ -459,10 +458,10 @@ void flipperham_app_free(FlipperHamApp *app)
 
 void flipperham_send_hardcoded_message(FlipperHamApp *app)
 {
-    static const uint32_t a[] = {0, 2000, 4000, 8000, 15000};
+    static const uint32_t repeat_delay_ms[] = {0, 2000, 4000, 8000, 15000};
     uint8_t i;
-    uint32_t b, c;
-    bool stopnow;
+    uint32_t elapsed, repeat_scale_k;
+    bool was_cancelled;
 
     if (!app->pkt)
         app->pkt = malloc(sizeof(Packet));
@@ -494,7 +493,7 @@ void flipperham_send_hardcoded_message(FlipperHamApp *app)
     furi_hal_light_set(LightBlue, 0);
     furi_hal_light_set(LightRed, 0);
     furi_hal_light_set(LightGreen, 0);
-    c = repeat_scale(app);
+    repeat_scale_k = repeat_scale(app);
     furi_hal_power_suppress_charge_enter();
 
     for (i = 0; i < app->repeat_n; i++)
@@ -548,7 +547,7 @@ void flipperham_send_hardcoded_message(FlipperHamApp *app)
         if (i + 1 >= app->repeat_n)
             break;
 
-        app->repeat_to = a[i + 1] * c;
+        app->repeat_to = repeat_delay_ms[i + 1] * repeat_scale_k;
         app->repeat_wait = true;
         app->tx_done = false;
 
@@ -557,12 +556,12 @@ void flipperham_send_hardcoded_message(FlipperHamApp *app)
             if (app->repeat_cancel)
                 break;
 
-            b = furi_get_tick() - app->repeat_t0;
-            if (b >= app->repeat_to)
+            elapsed = furi_get_tick() - app->repeat_t0;
+            if (elapsed >= app->repeat_to)
                 break;
 
             view_port_update(app->view_port);
-            furi_delay_ms(50 * c);
+            furi_delay_ms(50 * repeat_scale_k);
         }
 
         app->repeat_wait = false;
@@ -570,10 +569,10 @@ void flipperham_send_hardcoded_message(FlipperHamApp *app)
             break;
     }
 
-    stopnow = app->repeat_cancel;
+    was_cancelled = app->repeat_cancel;
     app->repeat_wait = false;
     app->repeat_cancel = false;
-    if (!stopnow)
+    if (!was_cancelled)
     {
         app->show_done = true;
         app->tx_done = true;
