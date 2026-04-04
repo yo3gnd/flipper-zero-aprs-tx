@@ -58,6 +58,7 @@ typedef struct FlipperHamApp
     uint8_t repeat_i;
     bool repeat_wait;
     bool repeat_cancel;
+    bool repeat_more;
     Packet *pkt;
     uint16_t *wave;
     uint16_t wave_len;
