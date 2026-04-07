@@ -10,6 +10,38 @@
 #include <string.h>
 
 static void status_input(InputEvent *event, void *context);
+static void dbgtune(FlipperHamApp *app, InputKey key);
+
+static void dbgtune(FlipperHamApp *app, InputKey key)
+{
+    if (!app)
+        return;
+
+    if (key == InputKeyLeft)
+    {
+        app->dbg_mod = app->dbg_mod ? 0 : 1;
+        return;
+    }
+
+    if (key == InputKeyUp)
+    {
+        if (app->dbg_dev < 8)
+            app->dbg_dev++;
+        else
+            app->dbg_dev = 0;
+        return;
+    }
+
+    if (key == InputKeyDown)
+    {
+        if (app->dbg_dev > 0)
+            app->dbg_dev--;
+        else
+            app->dbg_dev = 8;
+    }
+
+
+}
 
 void flipperham_status_view_alloc(FlipperHamApp *app)
 {
@@ -190,13 +222,22 @@ static void status_input(InputEvent *event, void *context)
 
     if (event->type != InputTypeShort)
         return;
-    if (app->debug_tx && app->show_done)
+    if (app->debug_tx)
     {
-        if (event->key == InputKeyOk)
-            app->repeat_more = true;
-        else
-            app->repeat_cancel = true;
-        return;
+        if (event->key == InputKeyLeft || event->key == InputKeyUp || event->key == InputKeyDown)
+        {
+            dbgtune(app, event->key);
+            return;
+        }
+
+        if (app->show_done)
+        {
+            if (event->key == InputKeyOk)
+                app->repeat_more = true;
+            else if (event->key == InputKeyBack)
+                app->repeat_cancel = true;
+            return;
+        }
     }
     if (event->key != InputKeyBack)
         return;
@@ -314,6 +355,8 @@ FlipperHamApp *flipperham_app_alloc(void)
     app->wave = NULL;
 
     cfgload(app);
+    app->dbg_mod = app->rf_mod;
+    app->dbg_dev = app->rf_dev;
 
     view_dispatcher_attach_to_gui(app->view_dispatcher, app->gui, ViewDispatcherTypeFullscreen);
     splash_view_alloc(app);

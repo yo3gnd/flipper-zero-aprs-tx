@@ -134,10 +134,10 @@ static void tx_debug_packet(Canvas *canvas, FlipperHamApp *app)
     if (path) snprintf(a, sizeof(a), "%s>%s,%s:%c", src, MY_TOCALL, path, s[0]);
     else snprintf(a, sizeof(a), "%s>%s:%c", src, MY_TOCALL, s[0]);
 
-    y = 29;
+    y = 37;
     tx_debug_wrap(canvas, &y, a);
-    if (y == 37)
-        y = 39;
+    if (y == 45)
+        y = 47;
 
     if (s[1])
         tx_debug_wrap(canvas, &y, s + 1);
@@ -146,6 +146,7 @@ static void tx_debug_packet(Canvas *canvas, FlipperHamApp *app)
 
 static void tx_debug_draw(Canvas *canvas, FlipperHamApp *app)
 {
+    static const char *dl[] = {"1.6", "1.8", "2.0", "2.2", "2.4", "2.5", "2.8", "3.0", "5.0"};
     char a[24];
     uint32_t hz;
     const char *st = app->repeat_wait ? "Wait" : "TX";
@@ -164,6 +165,9 @@ static void tx_debug_draw(Canvas *canvas, FlipperHamApp *app)
 
     x = (uint8_t)(128 - (strlen(st) * 6));
     canvas_draw_str(canvas, x, 15, st);
+
+    snprintf(a, sizeof(a), "%s %s", app->dbg_mod ? "GFSK" : "2FSK", dl[app->dbg_dev < 9 ? app->dbg_dev : 8]);
+    canvas_draw_str(canvas, 0, 23, a);
 
     if (app->pkt)
         tx_debug_packet(canvas, app);
@@ -1060,6 +1064,7 @@ void profile_change(VariableItem *item)
         app->rf_mod = 0;
 
     variable_item_set_current_value_text(item, app->rf_mod ? "GFSK" : "2FSK");
+    app->dbg_mod = app->rf_mod;
     preset_fix(app);
     cfgsave(app);
 }
@@ -1074,6 +1079,7 @@ void deviation_change(VariableItem *item)
         app->rf_dev = 8;
 
     variable_item_set_current_value_text(item, dl[app->rf_dev]);
+    app->dbg_dev = app->rf_dev;
     preset_fix(app);
     cfgsave(app);
 }
