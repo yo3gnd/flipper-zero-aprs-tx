@@ -10,12 +10,11 @@
 #include <string.h>
 
 static void status_input(InputEvent *event, void *context);
-static void dbgtune(FlipperHamApp *app, InputKey key);
+static void dbgkey(FlipperHamApp *app, InputKey key);
 
-static void dbgtune(FlipperHamApp *app, InputKey key)
+static void dbgkey(FlipperHamApp *app, InputKey key)
 {
-    if (!app)
-        return;
+    if (!app) return;
 
     if (key == InputKeyLeft)
     {
@@ -25,19 +24,13 @@ static void dbgtune(FlipperHamApp *app, InputKey key)
 
     if (key == InputKeyUp)
     {
-        if (app->dbg_dev < 8)
-            app->dbg_dev++;
-        else
-            app->dbg_dev = 0;
+        if (app->dbg_dev < 8) app->dbg_dev++; else app->dbg_dev = 0;
         return;
     }
 
     if (key == InputKeyDown)
     {
-        if (app->dbg_dev > 0)
-            app->dbg_dev--;
-        else
-            app->dbg_dev = 8;
+        if (app->dbg_dev > 0) app->dbg_dev--; else app->dbg_dev = 8;
     }
 
 
@@ -220,27 +213,23 @@ static void status_input(InputEvent *event, void *context)
 {
     FlipperHamApp *app = context;
 
-    if (event->type != InputTypeShort)
-        return;
+    if (event->type != InputTypeShort) return;
     if (app->debug_tx)
     {
         if (event->key == InputKeyLeft || event->key == InputKeyUp || event->key == InputKeyDown)
         {
-            dbgtune(app, event->key);
+            dbgkey(app, event->key);
             return;
         }
 
         if (app->show_done)
         {
-            if (event->key == InputKeyOk)
-                app->repeat_more = true;
-            else if (event->key == InputKeyBack)
-                app->repeat_cancel = true;
+            if (event->key == InputKeyOk) app->repeat_more = true;
+            else if (event->key == InputKeyBack) app->repeat_cancel = true;
             return;
         }
     }
-    if (event->key != InputKeyBack)
-        return;
+    if (event->key != InputKeyBack) return;
 
     app->repeat_cancel = true;
     if (app->tx_started && !app->tx_done)
@@ -507,7 +496,7 @@ void flipperham_send_hardcoded_message(FlipperHamApp *app)
 {
     static const uint32_t repeat_delay_ms[] = {0, 2000, 4000, 8000, 15000};
     uint8_t i, n;
-    uint32_t elapsed, repeat_scale_k, wait_ms;
+    uint32_t dt, rk, wait_ms;
     bool was_cancelled;
 
     if (!app->pkt)
@@ -541,7 +530,7 @@ void flipperham_send_hardcoded_message(FlipperHamApp *app)
     furi_hal_light_set(LightBlue, 0);
     furi_hal_light_set(LightRed, 0);
     furi_hal_light_set(LightGreen, 0);
-    repeat_scale_k = repeat_scale(app);
+    rk = repeat_scale(app);
     furi_hal_power_suppress_charge_enter();
 
     n = app->repeat_n;
@@ -603,7 +592,7 @@ again:
             wait_ms = 2000;
         }
         else
-            wait_ms = repeat_delay_ms[i + 1] * repeat_scale_k;
+            wait_ms = repeat_delay_ms[i + 1] * rk;
         app->repeat_to = wait_ms;
         app->repeat_wait = true;
         app->tx_done = false;
@@ -613,12 +602,11 @@ again:
             if (app->repeat_cancel)
                 break;
 
-            elapsed = furi_get_tick() - app->repeat_t0;
-            if (elapsed >= app->repeat_to)
-                break;
+            dt = furi_get_tick() - app->repeat_t0;
+            if (dt >= app->repeat_to) break;
 
             view_port_update(app->view_port);
-            furi_delay_ms(50 * repeat_scale_k);
+            furi_delay_ms(50 * rk);
         }
 
         app->repeat_wait = false;

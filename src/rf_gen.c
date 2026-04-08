@@ -69,7 +69,7 @@ static bool wave_add(FlipperHamApp *app, double value);
 static LevelDuration edge_yield(void *context);
 static uint16_t round_u16_even(double value);
 static const char *aprs_path_pick(FlipperHamApp *app);
-static void preset_pick(uint8_t mod, uint8_t dev);
+static void presetpick(uint8_t mod, uint8_t dev);
 
 FLIPPERHAM_ASYNC_PRESET(flipperham_preset_2fsk_d00_async_regs, 0x04, 0x83, 0x67, 0x00)
 FLIPPERHAM_ASYNC_PRESET(flipperham_preset_2fsk_d01_async_regs, 0x04, 0x83, 0x67, 0x01)
@@ -132,31 +132,26 @@ static const char *aprs_path_pick(FlipperHamApp *app)
     return paths[app->aprs_path_index];
 }
 
-static void preset_pick(uint8_t mod, uint8_t dev)
+static void presetpick(uint8_t mod, uint8_t dev)
 {
-    uint8_t preset_index;
+    uint8_t i;
 
-    if (mod > 1)
-        mod = 0;
-    if (dev > 8)
-        dev = 8;
+    if (mod > 1) mod = 0;
+    if (dev > 8) dev = 8;
 
-    preset_index = (dev * 2) + mod;
-    if (preset_index >= sizeof(flipperham_presets) / sizeof(flipperham_presets[0]))
-        preset_index = FlipperHamPresetDefault;
+    i = (dev * 2) + mod;
+    if (i >= sizeof(flipperham_presets) / sizeof(flipperham_presets[0])) i = FlipperHamPresetDefault;
 
-    flipperham_preset = &flipperham_presets[preset_index];
+    flipperham_preset = &flipperham_presets[i];
 
 
 }
 
 void preset_fix(FlipperHamApp *app)
 {
-    if (app->rf_mod > 1)
-        app->rf_mod = 0;
-    if (app->rf_dev > 8)
-        app->rf_dev = 8;
-    preset_pick(app->rf_mod, app->rf_dev);
+    if (app->rf_mod > 1) app->rf_mod = 0;
+    if (app->rf_dev > 8) app->rf_dev = 8;
+    presetpick(app->rf_mod, app->rf_dev);
 }
 
 uint32_t tx_freq_get(FlipperHamApp *app)
@@ -380,10 +375,8 @@ void txstart(FlipperHamApp *app)
                     src_ssid = app->ham_ssid[app->ham_index];
             }
 
-    if (app->debug_tx)
-        preset_pick(app->dbg_mod, app->dbg_dev);
-    else
-        preset_pick(app->rf_mod, app->rf_dev);
+    if (app->debug_tx) presetpick(app->dbg_mod, app->dbg_dev);
+    else presetpick(app->rf_mod, app->rf_dev);
 
     if (!aprs_packet(app->pkt, src, src_ssid, MY_TOCALL, 0, message, path))
         return;

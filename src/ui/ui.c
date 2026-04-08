@@ -36,28 +36,24 @@ static void aprs_path_up(char *s)
 
 }
 
-static const char *tx_debug_path(FlipperHamApp *app)
+static const char *txdbgpath(FlipperHamApp *app)
 {
     static const char *a[] = {"None", "RFONLY", "NOGATE", "WIDE1-1", "WIDE2-2", "ARISS", "APRSAT", "Custom"};
 
-    if (!app)
-        return NULL;
-    if (app->aprs_path_index >= sizeof(a) / sizeof(a[0]))
-        return NULL;
-    if (app->aprs_path_index == 0)
-        return NULL;
+    if (!app) return NULL;
+    if (app->aprs_path_index >= sizeof(a) / sizeof(a[0])) return NULL;
+    if (app->aprs_path_index == 0) return NULL;
 
 
     return a[app->aprs_path_index];
 }
 
-static void tx_debug_src(char *out, uint16_t n, FlipperHamApp *app)
+static void txdbgsrc(char *out, uint16_t n, FlipperHamApp *app)
 {
     const char *src = MY_CALL;
     uint8_t ssid = 0;
 
-    if (!out || !n)
-        return;
+    if (!out || !n) return;
     out[0] = 0;
 
     if (app && app->ham_n)
@@ -67,19 +63,17 @@ static void tx_debug_src(char *out, uint16_t n, FlipperHamApp *app)
         ssid = app->ham_ssid[app->ham_index];
     }
 
-    if (ssid) snprintf(out, n, "%s-%u", src, ssid);
-    else snprintf(out, n, "%s", src);
+    if (ssid) snprintf(out, n, "%s-%u", src, ssid); else snprintf(out, n, "%s", src);
 
 
 }
 
-static void tx_debug_wrap(Canvas *canvas, uint8_t *y, const char *s)
+static void txdbgwrap(Canvas *canvas, uint8_t *y, const char *s)
 {
     char a[24];
     uint8_t i, k, n;
 
-    if (!canvas || !y || !s)
-        return;
+    if (!canvas || !y || !s) return;
 
     while (*s && *y <= 63)
     {
@@ -92,13 +86,10 @@ static void tx_debug_wrap(Canvas *canvas, uint8_t *y, const char *s)
             n++;
         }
 
-        if (!s[n])
-            ;
-        else if (k)
-            n = k;
+        if (!s[n]) ;
+        else if (k) n = k;
 
-        if (!n)
-            n = 21;
+        if (!n) n = 21;
 
         for (i = 0; i < n; i++)
             a[i] = s[i];
@@ -113,7 +104,7 @@ static void tx_debug_wrap(Canvas *canvas, uint8_t *y, const char *s)
 
 }
 
-static void tx_debug_packet(Canvas *canvas, FlipperHamApp *app)
+static void txdbgpacket(Canvas *canvas, FlipperHamApp *app)
 {
     char a[40];
     char src[16];
@@ -121,30 +112,25 @@ static void tx_debug_packet(Canvas *canvas, FlipperHamApp *app)
     const char *path;
     uint8_t y;
 
-    if (!app || !app->pkt)
-        return;
+    if (!app || !app->pkt) return;
 
     s = (const char *)app->pkt->payload;
-    if (!s) return;
-    if (!s[0]) return;
+    if (!s || !s[0]) return;
 
-    path = tx_debug_path(app);
-    tx_debug_src(src, sizeof(src), app);
+    path = txdbgpath(app);
+    txdbgsrc(src, sizeof(src), app);
 
-    if (path) snprintf(a, sizeof(a), "%s>%s,%s:%c", src, MY_TOCALL, path, s[0]);
-    else snprintf(a, sizeof(a), "%s>%s:%c", src, MY_TOCALL, s[0]);
+    if (path) snprintf(a, sizeof(a), "%s>%s,%s:%c", src, MY_TOCALL, path, s[0]); else snprintf(a, sizeof(a), "%s>%s:%c", src, MY_TOCALL, s[0]);
 
     y = 37;
-    tx_debug_wrap(canvas, &y, a);
-    if (y == 45)
-        y = 47;
+    txdbgwrap(canvas, &y, a);
+    if (y == 45) y = 47;
 
-    if (s[1])
-        tx_debug_wrap(canvas, &y, s + 1);
+    if (s[1]) txdbgwrap(canvas, &y, s + 1);
 
 }
 
-static void tx_debug_draw(Canvas *canvas, FlipperHamApp *app)
+static void txdbgdraw(Canvas *canvas, FlipperHamApp *app)
 {
     static const char *dl[] = {"1.6", "1.8", "2.0", "2.2", "2.4", "2.5", "2.8", "3.0", "5.0"};
     char a[24];
@@ -169,8 +155,7 @@ static void tx_debug_draw(Canvas *canvas, FlipperHamApp *app)
     snprintf(a, sizeof(a), "%s %s", app->dbg_mod ? "GFSK" : "2FSK", dl[app->dbg_dev < 9 ? app->dbg_dev : 8]);
     canvas_draw_str(canvas, 0, 23, a);
 
-    if (app->pkt)
-        tx_debug_packet(canvas, app);
+    if (app->pkt) txdbgpacket(canvas, app);
 
 
 }
@@ -183,7 +168,7 @@ void flipperham_draw_callback(Canvas *canvas, void *context)
 
     if (app->debug_tx && app->tx_allowed && app->pkt)
     {
-        tx_debug_draw(canvas, app);
+        txdbgdraw(canvas, app);
         return;
     }
 
@@ -1050,7 +1035,7 @@ static void debug_change(VariableItem *item)
 {
     FlipperHamApp *app = variable_item_get_context(item);
 
-    app->debug_tx = variable_item_get_current_value_index(item) ? true : false;
+    app->debug_tx = variable_item_get_current_value_index(item) ? 1 : 0;
     variable_item_set_current_value_text(item, app->debug_tx ? "Yes" : "No");
     cfgsave(app);
 }
@@ -1060,8 +1045,7 @@ void profile_change(VariableItem *item)
     FlipperHamApp *app = variable_item_get_context(item);
 
     app->rf_mod = variable_item_get_current_value_index(item);
-    if (app->rf_mod > 1)
-        app->rf_mod = 0;
+    if (app->rf_mod > 1) app->rf_mod = 0;
 
     variable_item_set_current_value_text(item, app->rf_mod ? "GFSK" : "2FSK");
     app->dbg_mod = app->rf_mod;
@@ -1075,8 +1059,7 @@ void deviation_change(VariableItem *item)
     FlipperHamApp *app = variable_item_get_context(item);
 
     app->rf_dev = variable_item_get_current_value_index(item);
-    if (app->rf_dev > 8)
-        app->rf_dev = 8;
+    if (app->rf_dev > 8) app->rf_dev = 8;
 
     variable_item_set_current_value_text(item, dl[app->rf_dev]);
     app->dbg_dev = app->rf_dev;
