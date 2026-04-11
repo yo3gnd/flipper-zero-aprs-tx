@@ -43,6 +43,8 @@ static const char *txdbgpath(FlipperHamApp *app)
     if (!app) return NULL;
     if (app->aprs_path_index >= sizeof(a) / sizeof(a[0])) return NULL;
     if (app->aprs_path_index == 0) return NULL;
+    if (app->aprs_path_index == 7 && app->aprs_path_edit[0]) return app->aprs_path_edit;
+    if (app->aprs_path_index == 7) return NULL;
 
 
     return a[app->aprs_path_index];

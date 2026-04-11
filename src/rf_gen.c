@@ -121,12 +121,11 @@ static const char *aprs_path_pick(FlipperHamApp *app)
 {
     static const char *paths[] = {"None", "RFONLY", "NOGATE", "WIDE1-1", "WIDE2-2", "ARISS", "APRSAT", "Custom"};
 
-    if (!app)
-        return NULL;
-    if (app->aprs_path_index >= sizeof(paths) / sizeof(paths[0]))
-        return NULL;
-    if (app->aprs_path_index == 0)
-        return NULL;
+    if (!app) return NULL;
+    if (app->aprs_path_index >= sizeof(paths) / sizeof(paths[0])) return NULL;
+    if (app->aprs_path_index == 0) return NULL;
+    if (app->aprs_path_index == 7 && app->aprs_path_edit[0]) return app->aprs_path_edit;
+    if (app->aprs_path_index == 7) return NULL;
 
 
     return paths[app->aprs_path_index];
