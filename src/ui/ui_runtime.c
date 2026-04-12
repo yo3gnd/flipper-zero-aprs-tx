@@ -1,5 +1,6 @@
 #include "ui_i.h"
 #include "ui_splash.h"
+#include "../version.h"
 
 #include <furi_hal.h>
 #include <notification/notification.h>
@@ -382,12 +383,18 @@ FlipperHamApp *flipperham_app_alloc(void)
     ssidfix(app);
     ham_menu_build(app);
     ham_tx_menu_build(app);
-    widget_add_text_scroll_element(
-        app->readme_widget, 0, 0, 128, 52,
+
+    snprintf(
+        app->readme_h, sizeof(app->readme_h),
+        "Version: %s\nCommit %s\nBuilt: %s\nHost: %s\n"
         "APRS experimental transmiter for Flipper. Don't transmit where you shouldn't. Uses FSK "
         "as a weak substitute for FM. Works, sometimes.\n\nI'm quite interested on what kind of "
         "hardware and with what parameters you got decodes.\n\nReports are really appreciated. Contact "
-        "me at:\n\nwww.yo3gnd.ro\nyo3gnd@gmail.com\ngithub.com/yo3gnd\ninstagram: @yo3gnd\ntiktok: @yo3ngd\nyoutube.com/@yo3gnd\n\n");
+        "me at:\n\nwww.yo3gnd.ro\nyo3gnd@gmail.com\ngithub.com/yo3gnd\ninstagram: @yo3gnd\ntiktok: @yo3ngd\nyoutube.com/@yo3gnd\n\n",
+        APP_VER_TEXT, APP_BUILD_COMMIT, APP_BUILD_TIME, APP_BUILD_HOST);
+
+    widget_add_text_scroll_element(
+        app->readme_widget, 0, 0, 128, 52, app->readme_h);
     widget_add_button_element(app->readme_widget, GuiButtonTypeLeft, "Back", readme_back, app);
 
     view_set_previous_callback(submenu_get_view(app->submenu), flipperham_exit_callback);

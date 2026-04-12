@@ -26,12 +26,16 @@ To use this, you will need to configure your handheld or a gateway, like direwol
 
 To reduce the chance of accidental traffic on the live APRS network, the default identity is the clearly artificial callsign `FL1PPR-0`, which, luckily enough, sits in a rarely used `F` block. That makes experimental packets easier to recognize and filter.
 
+- If it doesn't work for you: enable debug mode, then press up/down to change deviation or left to toggle 2FSK/GFSK. Find a setting that works. It might take a few tries and different orientations for the first message to decode
+
 ## Build
 
 ```sh
 ./fbt build APPSRC=flipperham
 ./fbt launch APPSRC=flipperham
 ```
+
+- application.fam will import gitver.py to get the latest revision id from git plus some metadata. This metadata will be burnt into the elf
 
 ## Notes
 
