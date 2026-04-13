@@ -387,7 +387,7 @@ FlipperHamApp *flipperham_app_alloc(void)
     snprintf(
         app->readme_h, sizeof(app->readme_h),
         "Version: %s\nCommit %s\nBuilt: %s\nHost: %s\n"
-        "APRS experimental transmiter for Flipper. Don't transmit where you shouldn't. Uses FSK "
+        "APRS experimental transmitter for Flipper. Don't transmit where you shouldn't. Uses FSK "
         "as a weak substitute for FM. Works, sometimes.\n\nI'm quite interested on what kind of "
         "hardware and with what parameters you got decodes.\n\nReports are really appreciated. Contact "
         "me at:\n\nwww.yo3gnd.ro\nyo3gnd@gmail.com\ngithub.com/yo3gnd\ninstagram: @yo3gnd\ntiktok: @yo3ngd\nyoutube.com/@yo3gnd\n\n",

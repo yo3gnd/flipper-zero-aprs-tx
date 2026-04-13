@@ -248,7 +248,7 @@ void freq_edit_menu_build(FlipperHamApp *app)
     variable_item_set_current_value_text(it, app->f_bad ? "bad" : "");
 
     variable_item_list_add(app->freq_edit_menu, "Save", 1, NULL, NULL);
-    variable_item_list_add(app->freq_edit_menu, "Select for TX", 1, NULL, NULL);
+    variable_item_list_add(app->freq_edit_menu, "Use this for TX", 1, NULL, NULL);
 
     if (app->freq_n > 1)
         if (app->freq_index < FREQ_N)

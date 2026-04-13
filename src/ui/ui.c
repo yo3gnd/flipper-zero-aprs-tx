@@ -595,7 +595,7 @@ void bulletin_menu_build(FlipperHamApp *app)
     uint8_t i;
 
     submenu_reset(app->bulletin_menu);
-    submenu_set_header(app->bulletin_menu, "Select Bulleting");
+    submenu_set_header(app->bulletin_menu, "Select Bulletin");
     submenu_add_item(app->bulletin_menu, "Add new...", FlipperHamBulletinIndexAdd,
                      flipperham_bulletin_callback, app);
 
@@ -779,7 +779,7 @@ void ham_tx_menu_build(FlipperHamApp *app)
     snprintf(a, sizeof(a), "%u", app->ham_ssid[app->ham_tx_index]);
     variable_item_set_current_value_text(it, a);
 
-    variable_item_list_add(app->ham_tx_menu, "Select for TX", 0, NULL, NULL);
+    variable_item_list_add(app->ham_tx_menu, "Use this for TX", 0, NULL, NULL);
     variable_item_list_set_selected_item(app->ham_tx_menu, app->ham_tx_sel);
 }
 
