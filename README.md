@@ -2,11 +2,18 @@ An experimental APRS / AX.25 transmitter for Flipper Zero.
 
 Idea and prototype by [Richard YO3GND](https://www.qrz.com/db/YO3GND) - [Read tech post](https://yo3gnd.ro/blog/flipper-zero-aprs-tx)
 
-[![Watch demo video](https://img.youtube.com/vi/OhWlq-4IK9E/hqdefault.jpg)](https://www.youtube.com/watch?v=OhWlq-4IK9E)
-
 There are plenty of audio APRS hacks that feed a handheld with audio from Flipper. This is not that. This is a SubGHZ hack that allows you to send something APRS-like using only the FZ. Decode success is still inconsistent; the signal is unconventional, imperfect, and heavily dependent on the receiver. Software seems to do fine with it (direwolf, qtmm). Some hardware decoders struggled. An UV878 works. It is malformed badly enough, losing phase information and bending the encoding to keep up with what the Flipper can do, that I am still surprised it works.
 
-<p align="center"> <img src="docs/milestone3.webp" alt="Flipper sending an APRS message to YO3GND-2, received on a UV878"> </p>
+<table>
+<tr>
+<td width="50%">
+<a href="https://www.youtube.com/watch?v=OhWlq-4IK9E"><img src="docs/th1.webp" alt="Watch demo video" width="100%"></a>
+</td>
+<td width="50%">
+<img src="docs/milestone3.webp" alt="Flipper sending an APRS message to YO3GND-2, received on a UV878" width="100%">
+</td>
+</tr>
+</table>
 
 This app can send:
 - APRS messages
