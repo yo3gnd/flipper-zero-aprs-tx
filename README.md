@@ -1,11 +1,19 @@
 An experimental APRS / AX.25 transmitter for Flipper Zero.
 
-Idea and prototype by [Richard YO3GND](https://www.qrz.com/db/YO3GND) - [Read tech post](https://yo3gnd.ro/blog/flipper-zero-aprs-tx)
-
+Idea and prototype by [Richard YO3GND](https://www.qrz.com/db/YO3GND) - [Read tech post](https://yo3gnd.ro/blog/2604a--flipper-zero-aprs-tx)
 
 There are plenty of audio APRS hacks that feed a handheld with audio from Flipper. This is not that. This is a SubGHZ hack that allows you to send something APRS-like using only the FZ. Decode success is still inconsistent; the signal is unconventional, imperfect, and heavily dependent on the receiver. Software seems to do fine with it (direwolf, qtmm). Some hardware decoders struggled. An UV878 works. It is malformed badly enough, losing phase information and bending the encoding to keep up with what the Flipper can do, that I am still surprised it works.
 
-<p align="center"> <img src="docs/milestone3.webp" alt="Flipper sending an APRS message to YO3GND-2, received on a UV878"> </p>
+<table>
+<tr>
+<td width="50%">
+<a href="https://www.youtube.com/watch?v=OhWlq-4IK9E"><img src="docs/th1.webp" alt="Watch demo video" width="100%"></a>
+</td>
+<td width="50%">
+<img src="docs/milestone3.webp" alt="Flipper sending an APRS message to YO3GND-2, received on a UV878" width="100%">
+</td>
+</tr>
+</table>
 
 This app can send:
 - APRS messages
@@ -15,10 +23,15 @@ This app can send:
 
 It lets you manage each packet type, keep a small destination callbook, and tune a few radio-side parameters to improve decoding. However, at its core, this is a deliberately rough FSK hack pretending to be FM, and it relies heavily on the receiver's discriminator and filters.
 
-![Settings](docs/pics/Screenshot-20231015-082113.png) ![More settings](docs/pics/Screenshot-20231015-082119.png)
+<p align="center">
+<img src="docs/pics/Screenshot-20231015-082113.png" alt="Settings" width="25%">
+<img src="docs/pics/Screenshot-20231015-082119.png" alt="More settings" width="25%">
+</p>
 
-
-![Callbook](docs/pics/Screenshot-20231015-082145.png) ![TX Screen](docs/pics/Screenshot-20231015-082151.png)
+<p align="center">
+<img src="docs/pics/Screenshot-20231015-082145.png" alt="Callbook" width="25%">
+<img src="docs/pics/Screenshot-20231015-082151.png" alt="TX Screen" width="25%">
+</p>
 
 ## Usage
 
