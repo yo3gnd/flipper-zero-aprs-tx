@@ -1,3 +1,0 @@
-TEST TEST 123
-HELLO WORLD
-Hello world, I am Flipper Zero :D
