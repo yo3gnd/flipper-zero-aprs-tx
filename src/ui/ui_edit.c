@@ -365,8 +365,8 @@ void p(void* context, uint32_t index) {
     app->pos_used[app->pos_index] = 0;
 
     snprintf(app->p_name_edit, sizeof(app->p_name_edit), "Position");
-    snprintf(app->p_lat_edit, sizeof(app->p_lat_edit), "0.00");
-    snprintf(app->p_lon_edit, sizeof(app->p_lon_edit), "0.00");
+    snprintf(app->p_lat_edit, sizeof(app->p_lat_edit), "0.0000");
+    snprintf(app->p_lon_edit, sizeof(app->p_lon_edit), "0.0000");
     pos_edit_menu_build(app);
     view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewPosEdit);
 }
@@ -408,10 +408,17 @@ void position_save(void* context) {
     i = app->pos_index;
     if(i >= TXT_N) return;
 
-    if(app->text_mode == 6)
+    if(app->text_mode == 6) {
         snprintf(app->pos_name[i], sizeof(app->pos_name[i]), "%s", app->p_name_edit);
+        if(!app->p_lat_edit[0]) snprintf(app->p_lat_edit, sizeof(app->p_lat_edit), "0.00000");
+        if(!app->p_lon_edit[0]) snprintf(app->p_lon_edit, sizeof(app->p_lon_edit), "0.00000");
+        snprintf(app->pos_lat[i], sizeof(app->pos_lat[i]), "%s", app->p_lat_edit);
+        snprintf(app->pos_lon[i], sizeof(app->pos_lon[i]), "%s", app->p_lon_edit);
+    }
     if(app->text_mode == 7) {
-        if(aprs_ll_clamp(a, sizeof(a), app->p_lat_edit, 0))
+        if(!app->p_lat_edit[0])
+            snprintf(app->p_lat_edit, sizeof(app->p_lat_edit), "0.00000");
+        else if(aprs_ll_clamp(a, sizeof(a), app->p_lat_edit, 0))
             snprintf(app->p_lat_edit, sizeof(app->p_lat_edit), "%s", a);
         else if(app->pos_lat[i][0])
             snprintf(app->p_lat_edit, sizeof(app->p_lat_edit), "%s", app->pos_lat[i]);
@@ -420,7 +427,9 @@ void position_save(void* context) {
         snprintf(app->pos_lat[i], sizeof(app->pos_lat[i]), "%s", app->p_lat_edit);
     }
     if(app->text_mode == 8) {
-        if(aprs_ll_clamp(a, sizeof(a), app->p_lon_edit, 1))
+        if(!app->p_lon_edit[0])
+            snprintf(app->p_lon_edit, sizeof(app->p_lon_edit), "0.00000");
+        else if(aprs_ll_clamp(a, sizeof(a), app->p_lon_edit, 1))
             snprintf(app->p_lon_edit, sizeof(app->p_lon_edit), "%s", a);
         else if(app->pos_lon[i][0])
             snprintf(app->p_lon_edit, sizeof(app->p_lon_edit), "%s", app->pos_lon[i]);
