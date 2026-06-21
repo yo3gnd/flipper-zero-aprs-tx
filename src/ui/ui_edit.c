@@ -143,6 +143,16 @@ static void positionActionDo(void* context, uint32_t index) {
         title = "Edit name";
 
     app->text_view = FlipperHamViewPosAction;
+    if (app->text_mode == 7 || app->text_mode == 8)
+    {
+        UNUSED(title);
+        UNUSED(out);
+        UNUSED(n);
+        coord_input_start(app, app->text_mode == 8);
+        view_dispatcher_switch_to_view(app->view_dispatcher, FlipperHamViewCoordInput);
+        return;
+    }
+
     text_input_reset(app->text_input);
     text_input_set_header_text(app->text_input, title);
     text_input_set_result_callback(app->text_input, position_save, app, out, n, false);
