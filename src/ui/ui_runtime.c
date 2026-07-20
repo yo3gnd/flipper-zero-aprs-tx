@@ -371,7 +371,7 @@ FlipperHamApp* flipperham_app_alloc(void) {
         "APRS experimental transmitter for Flipper. Don't transmit where you shouldn't. Uses FSK "
         "as a weak substitute for FM. Works, sometimes.\n\nI'm quite interested on what kind of "
         "hardware and with what parameters you got decodes.\n\nReports are really appreciated. Contact "
-        "me at:\n\nwww.yo3gnd.ro\nyo3gnd@gmail.com\ngithub.com/yo3gnd\ninstagram: @yo3gnd\ntiktok: @yo3ngd\nyoutube.com/@yo3gnd\n\n",
+        "me at:\n\nwww.yo3gnd.ro\nyo3gnd@gmail.com\ngithub.com/yo3gnd\ninstagram: @yo3gnd\ntiktok: @yo3gnd\nyoutube.com/@yo3gnd\n\n",
         APP_VER_TEXT,
         APP_BUILD_COMMIT,
         APP_BUILD_TIME,
