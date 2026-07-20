@@ -2,7 +2,7 @@
 
 An experimental APRS / AX.25 transmitter for Flipper Zero.
 
-There are plenty of APRS contraptions that use the Flipper as an audio source for a handheld. This is not that. This app abuses the Sub-GHz radio directly and transmits something APRS-like using only the Flipper itself. It works rather better than it ought to, and rather less properly than any respectable radio design would.
+There are plenty of APRS contraptions that use the Flipper as an audio source for a handheld. This is not that. This app abuses the Sub-GHz radio directly, through the internal radio or an external CC1101, and transmits something APRS-like. It works rather better than it ought to, and rather less properly than any respectable radio design would.
 
 The result is usable, but still experimental. The signal is unconventional, the modulation is a compromise, and decode quality depends heavily on the receiver. Software decoders tend to be more forgiving. Hardware varies from pleasantly cooperative to deeply unimpressed.
 

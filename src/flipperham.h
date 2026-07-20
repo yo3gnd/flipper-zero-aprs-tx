@@ -18,9 +18,9 @@
 
 #define CFG_DIR       "/ext/apps_data/aprstx"
 #define CFG_FILE      "/ext/apps_data/aprstx/cfg.bin"
-#define CALLBOOK_DIR  "/ext/ham"
-#define CALLBOOK_FILE "/ext/ham/callbook.txt"
-#define MY_CALLS_FILE "/ext/ham/my-callsigns.txt"
+#define CALLBOOK_DIR  CFG_DIR
+#define CALLBOOK_FILE CFG_DIR "/callbook.txt"
+#define MY_CALLS_FILE CFG_DIR "/my-callsigns.txt"
 
 typedef struct {
     uint8_t encoding_index;
@@ -58,7 +58,13 @@ typedef struct {
     uint8_t aprs_path_index;
     char aprs_path_edit[APRS_PATH_LEN];
     uint8_t debug_tx;
+    uint8_t radio_backend;
 } FlipperHamCfg;
+
+enum {
+    FlipperHamRadioInternal = 0,
+    FlipperHamRadioExternal,
+};
 
 enum {
     FlipperHamViewMenu = 0,
@@ -102,6 +108,7 @@ enum {
 
 enum {
     FlipperHamSettingsIndexFreq = 0,
+    FlipperHamSettingsIndexRadio,
     FlipperHamSettingsIndexBaud,
     FlipperHamSettingsIndexAprsPath,
     FlipperHamSettingsIndexProfile,
