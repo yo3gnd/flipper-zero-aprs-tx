@@ -487,7 +487,7 @@ static void freq_input_commit(FlipperHamApp* app) {
     if(!freq_vfo_valid_hz(hz))
         app->freq_edit_hz = freq_input_old_hz;
     else if(!freq_tx_allowed_hz(hz))
-        app->freq_edit_hz = freq_default_hz();
+        app->freq_edit_hz = freq_input_old_hz;
     else
         app->freq_edit_hz = hz;
 
