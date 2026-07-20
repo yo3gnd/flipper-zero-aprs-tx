@@ -1,3 +1,6 @@
+v1.3.23:
+improved VFO picker
+
 v1.3.21:
 frequency picker, automatic radio fallback, clearer TX failure handling
 
