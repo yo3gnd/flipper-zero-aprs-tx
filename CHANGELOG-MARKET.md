@@ -1,3 +1,6 @@
+v1.3.24:
+fixed startup hang when app data files are missing
+
 v1.3.23:
 improved VFO picker
 
